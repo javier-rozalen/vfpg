@@ -33,7 +33,6 @@ metropolis = True
 erase_faulty_paths = False
 add_symmetric_paths = False
 plot_histogram = False
-save_plot = True
 plot_type = 'symmetrized'
 
 ###############################################################################
@@ -97,7 +96,11 @@ if metropolis:
                         x_axis.append(path[0])
                         x_axis_sym.append(path[0])
                         x_axis_sym.append(-path[0])
-                    histo(x_axis,x_axis_sym,S_paths[60:],M,N,seed)
+                    save_plot = True if len(paths)==M else False
+                    name_of_plot = plot_name if len(paths)==M else ''
+                    histo(x_axis,x_axis_sym,S_paths[60:],M,N,seed,name_of_plot,save_plot)
+                    if save_plot:
+                        print('Plot saved.')
               
             k += 1
 
@@ -140,18 +143,6 @@ if add_symmetric_paths:
     else:
         print('Skipping already symmetrized file...')
 
-################## WAVE FUNCTION COMPUTATION ####################
-if plot_histogram: 
-    if not os.path.exists(plot_name):
-        x_axis,x_axis_sym = [],[]
-        for path in paths[60:]:
-            x_axis.append(path[0])
-            x_axis_sym.append(path[0])
-            x_axis_sym.append(-path[0])
-        histo(x_axis,x_axis_sym,S_paths[60:],M,N,seed,plot_name,save_plot)
-
-    else:
-        print(f'Skipping the creation of already saved plot {plot_name}...')
 
 
 
