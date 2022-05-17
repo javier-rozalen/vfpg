@@ -26,5 +26,5 @@ def S_HO(x,h,m,w):
         x_i1 = x[i+1]
         x_i = x[i]
         S_prime += ((x_i1-x_i)/h)**2+(w*(x_i1+x_i)/2)**2
-    
+        
     return 0.5*m*h*S_prime
