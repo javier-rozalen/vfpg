@@ -1,5 +1,7 @@
+######### IMPORTS ##########
 import torch
 from torch import nn
+###########################
 
 def show_layers(model):
     print("\nLayers and parameters:\n")
@@ -20,9 +22,16 @@ class q_phi(nn.Module):
             self.lc1.weight = nn.Parameter(W1)
             self.lc1.bias = nn.Parameter(B)
             self.lc2.weight = nn.Parameter(W2)
+            
+    def gaussian_mixture(self,x,params):
+        return torch.sum(params)
+    
+    def prod_of_gaussians(self,x,params):
+        return torch.sum(params)
    
     # We set the architecture
     def forward(self, x): 
         o = self.actfun(self.lc1(x))
         o = self.lc2(o)
+        o = self.prod_of_gaussians(x,o)
         return o.squeeze()

@@ -5,7 +5,10 @@ Created on Mon Mar 28 11:01:52 2022
 
 @author: jozalen
 """
-
+import pathlib, os, sys
+initial_dir = pathlib.Path(__file__).parent.resolve()
+os.chdir(initial_dir)
+sys.path.append('.')
 ################################# IMPORTS #####################################
 # General
 import numpy as np
@@ -15,11 +18,11 @@ import scipy.integrate as integrate
 # My Modules
 from modules.actions import S_HO
 from modules.plotters import histo2
-from modules import dir_support
+from modules.dir_support import dir_support
 
 ################################# GENERAL PARAMETERS ##########################
 seed = 1
-N = 200 
+N = 50 
 mu = 0
 sigma = 1/6
 M = 10000
@@ -34,6 +37,7 @@ hbar = 1.
 metropolis = True
 
 ###############################################################################
+dir_support(['saved_data'])
 np.random.seed(seed)
 h = T/N
 
@@ -81,48 +85,56 @@ if metropolis:
     k = 0
     n_accepted = 1
     pbar = tqdm(total=M)
-    while n_accepted<M:
-        chi = np.random.normal(mu,sigma,N)
-        path_old = paths[-1]
-        path_new = path_old+d*chi
-        path_new[-1]=path_new[0]
-        S_new = S_HO(path_new,h,m,w)
-        S_old = S_HO(path_old,h,m,w)
-        delta_S = S_new-S_old
-        
-        if delta_S<=0:
-            accepted = True
-        else:
-            r = np.random.rand(1)
-            if r<np.exp(-delta_S):
-                accepted = True
-            else:
-                accepted = False
-          
-        if accepted:
-            n_accepted += 1
-            paths.append(path_new)
-            S_paths.append(S_new)
-            pbar.update(1)
-            if n_accepted > n_faulty:
-                wf = wf + histograma(path_new,dx)+histograma(-path_new,dx)
-                if n_accepted%leap == 0:
-                    x_axis = np.linspace(-4.95,4.95,100)
-                    wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
-                    histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new)
-          
-        k += 1
-    pbar.close()
+    with open(f'saved_data/paths_N{N}_M{M}.txt','w') as file:
+        with open(f'saved_data/actions_N{N}_M{M}.txt','w') as file2:
+            while n_accepted<M:
+                chi = np.random.normal(mu,sigma,N)
+                path_old = paths[-1]
+                path_new = path_old+d*chi
+                path_new[-1]=path_new[0]
+                S_new = S_HO(path_new,h,m,w)
+                S_old = S_HO(path_old,h,m,w)
+                delta_S = S_new-S_old
+                
+                if delta_S<=0:
+                    accepted = True
+                else:
+                    r = np.random.rand(1)
+                    if r<np.exp(-delta_S):
+                        accepted = True
+                    else:
+                        accepted = False
+                  
+                if accepted:
+                    n_accepted += 1
+                    paths.append(path_new)
+                    S_paths.append(S_new)
+                    file.write(' '.join([str(x) for x in path_new])+'\n')
+                    file.write(' '.join([str(x) for x in -path_new])+'\n')
+                    file2.write(str(S_new)+'\n')
+                    file2.write(str(S_new)+'\n')
+                    pbar.update(1)
+                    if n_accepted > n_faulty:
+                        wf = wf + histograma(path_new,dx)+histograma(-path_new,dx)
+                        if n_accepted%leap == 0:
+                            x_axis = np.linspace(-4.95,4.95,100)
+                            wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
+                            histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new)
+              
+                k += 1
+        pbar.close()
+        file.close()
+        file2.close()
     
 # We save the wave function data
-with open('wf.txt','w') as file:
+with open('saved_data/wf_N{N}_M{M}.txt','w') as file:
     for x,y in zip(x_axis,wf/wf_norm):
         file.write(str(x)+' '+str(y)+'\n')
     file.close()
     
 #%% ############ <X> #############
 x,y = [],[]
-with open('wf.txt','r') as file:
+with open('saved_data/wf_N{N}_M{M}.txt','r') as file:
     for line in file.readlines():
         line = line.split(' ')
         x.append(float(line[0]))
@@ -136,6 +148,7 @@ E_X2 = integrate.simpson(y=wf*x**2/wf_norm,x=x)
 E_X3 = integrate.simpson(y=wf*x**3/wf_norm,x=x)
 E_X4 = integrate.simpson(y=wf*x**4/wf_norm,x=x)
 E = m*w**2*E_X2
+print('\n')
 print(f'<X> = {E_X}')
 print(f'<X²> = {E_X2}')
 print(f'<X³> = {E_X3}')
