@@ -1,5 +1,5 @@
 ######### IMPORTS ##########
-import torch
+import torch,math
 from torch import nn
 ###########################
 
@@ -16,6 +16,7 @@ class q_phi(nn.Module):
         self.lc1 = nn.Linear(Nin,Nhid,bias=True) # shape = (Nhid,Nin)
         self.actfun = nn.Sigmoid() # activation function
         self.lc2 = nn.Linear(Nhid,Nout,bias=False) # shape = (Nout,Nhid)
+        self.softplus = nn.Softplus()
         
         # We set the parameters 
         with torch.no_grad():
@@ -27,7 +28,11 @@ class q_phi(nn.Module):
         return torch.sum(params)
     
     def prod_of_gaussians(self,x,params):
-        return torch.sum(params)
+        params_mu = params[:int(len(params)/2)]
+        params_sigma = self.softplus(params[int(len(params)/2):])
+        gaussians = (1/(torch.sqrt(2*torch.tensor(math.pi))*params_mu))*torch.exp(-0.5*((x-params_mu)/params_sigma)**2)
+        print(gaussians)
+        return torch.prod(gaussians)
    
     # We set the architecture
     def forward(self, x): 

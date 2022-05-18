@@ -6,7 +6,6 @@ import torch,math
 # My modules
 from modules.neural_networks import q_phi
 from modules.plotters import loss_plot
-from modules.actions import S_HO
 from modules.integration import simpson_weights
 from modules.aux_functions import train_loop
 from modules.physical_constants import *
@@ -56,10 +55,18 @@ def loss():
 
     """
     global I,I2,error
-    q_tensor = q_params_nn(x_tensor)
+    
+    q_manifold=[0]*M
+    c = 0
+    for x in path_manifold:
+        q_x = q_params_nn(x)
+        print(q_x)
+        q_manifold[c]=q_x
+        c+=1
+    q_tensor = torch.stack(q_manifold)
     
     # Monte Carlo integration 
-    I = (1/M)*torch.sum(torch.log(q_tensor)+(1/hbar)*S_tensor)
+    I = (1/M)*torch.sum((1/hbar)*S_tensor+torch.log(q_tensor))
     #I2 = (1/M)*torch.sum((torch.log(q_tensor)+(1/hbar)*S_tensor)**2)
     #error = (1/math.sqrt(M))*torch.sqrt(I2-I**2)
     
@@ -67,9 +74,9 @@ def loss():
 
 ######################## NN STUFF ########################
 Nin = N
-Nout = Nin
-W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.) 
-B = torch.rand(Nhid)*2.-torch.tensor(1.) 
+Nout = 2*Nin
+W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
+B = torch.rand(Nhid)*2.-torch.tensor(1.)
 W2 = torch.rand(Nout,Nhid,requires_grad=True) 
 q_params_nn = q_phi(Nin,Nhid,Nout,W1,W2,B)
 loss_fn = loss
@@ -81,4 +88,14 @@ for t in tqdm(range(n_epochs)):
     train_loop(loss_fn,optimizer)
     loss_list.append(I.item())
     x_axis.append(t)
-    #loss_plot(x=x_axis,y=loss_list)
+    print(x_axis,loss_list)
+    loss_plot(x=x_axis,y=loss_list)
+    
+    
+    
+    
+    
+    
+    
+    
+    
