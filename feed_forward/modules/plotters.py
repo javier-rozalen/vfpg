@@ -7,6 +7,7 @@ def loss_plot(x,y):
     ax.set_ylabel('Loss',fontsize=16)
     ax.set_title('Loss function',fontsize=18)
     ax.tick_params(axis='both',which='both',labelsize=15)
+    ax.axhline(0.,linestyle='--',color='red')
     ax.plot(x,y)
     
     plt.pause(0.001)

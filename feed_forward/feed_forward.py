@@ -13,14 +13,16 @@ from modules.physical_constants import *
 ######################## PARAMETERS ########################
 # General parameters
 Nhid = 100
-n_epochs = 100
+n_epochs = 10000
 t_0 = 0.
 t_f = 100.
 paths_file = '../MonteCarlo/saved_data/paths.txt'
 actions_file = '../MonteCarlo/saved_data/actions.txt'
+leap = n_epochs/100
+seed = 1
 
 # Training parameters
-learning_rate = 1e-2
+learning_rate = 1e-4
 epsilon = 1e-8
 smoothing_constant = 0.9
 
@@ -54,27 +56,21 @@ def loss():
         Kullback-Leibler divergence.
 
     """
-    global I,I2,error
+    global I,I2,error,logq_tensor
     
-    q_manifold=[0]*M
-    c = 0
-    for x in path_manifold:
-        q_x = q_params_nn(x)
-        print(q_x)
-        q_manifold[c]=q_x
-        c+=1
-    q_tensor = torch.stack(q_manifold)
+    logq_tensor = q_params_nn(x_tensor)
     
     # Monte Carlo integration 
-    I = (1/M)*torch.sum((1/hbar)*S_tensor+torch.log(q_tensor))
-    #I2 = (1/M)*torch.sum((torch.log(q_tensor)+(1/hbar)*S_tensor)**2)
-    #error = (1/math.sqrt(M))*torch.sqrt(I2-I**2)
+    I = -(1/M)*torch.sum((1/hbar)*S_tensor+logq_tensor)
+    I2 = (1/M)*torch.sum((logq_tensor+(1/hbar)*S_tensor)**2)
+    error = (1/math.sqrt(M))*torch.sqrt(I2-I**2)
     
     return I
 
 ######################## NN STUFF ########################
 Nin = N
-Nout = 2*Nin
+Nout = Nin
+torch.manual_seed(seed)
 W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
 B = torch.rand(Nhid)*2.-torch.tensor(1.)
 W2 = torch.rand(Nout,Nhid,requires_grad=True) 
@@ -88,8 +84,11 @@ for t in tqdm(range(n_epochs)):
     train_loop(loss_fn,optimizer)
     loss_list.append(I.item())
     x_axis.append(t)
-    print(x_axis,loss_list)
-    loss_plot(x=x_axis,y=loss_list)
+    #print(x_axis,loss_list)
+    if t == n_epochs-1 or (t+1)%leap==0:
+        print(I.item())
+        loss_plot(x=x_axis,y=loss_list)
+print('\nDone! :)')
     
     
     
