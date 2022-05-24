@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch,math
 
 # My modules
-from modules.neural_networks import q_phi
+from modules.neural_networks import *
 from modules.plotters import loss_plot
 from modules.integration import simpson_weights
 from modules.aux_functions import train_loop
@@ -13,7 +13,7 @@ from modules.dir_support import dir_support
 
 ######################## PARAMETERS ########################
 # General parameters
-Nhid = 100
+Nhid = 50
 n_epochs = 1000
 t_0 = 0.
 t_f = 100.
@@ -24,9 +24,11 @@ leap = n_epochs/20
 seed = 1
 save_model = True
 show_periodic_plots = True
+mini_batching = True
+batch_size = 1000
 
 # Training parameters
-learning_rate = 1e-5
+learning_rate = 1e-3
 epsilon = 1e-8
 smoothing_constant = 0.9
 
@@ -50,7 +52,7 @@ N = len(path_manifold[0])
 print('Data fetching complete.\n')
 
 ######################## LOSS FUNCTION ########################
-def loss():
+def loss(train_data):
     """
     Loss function.
 
@@ -62,11 +64,12 @@ def loss():
     """
     global I,I2,error,logq_tensor
     
-    logq_tensor = q_params_nn(x_tensor)
+    logq_tensor = q_params_nn(train_data)
     
     # Monte Carlo integration 
-    I = -(1/M)*torch.sum((1/hbar)*S_tensor+logq_tensor)
-    I2 = (1/M)*torch.sum((logq_tensor+(1/hbar)*S_tensor)**2)
+    M = len(train_data)
+    I = -(1/M)*torch.sum((1/hbar)*S_tensor[:M]+logq_tensor)
+    I2 = (1/M)*torch.sum((logq_tensor+(1/hbar)*S_tensor[:M])**2)
     error = (1/math.sqrt(M))*torch.sqrt(I2-I**2)
     
     return I
@@ -79,20 +82,33 @@ torch.manual_seed(seed)
 W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
 B = torch.rand(Nhid)*2.-torch.tensor(1.)
 W2 = torch.rand(Nout,Nhid,requires_grad=True) 
-q_params_nn = q_phi(Nin,Nhid,Nout,W1,W2,B)
+#q_params_nn = q_phi(Nin,Nhid,Nout,W1,W2,B)
+q_params_nn = q_phi_layers(Nin,Nhid,Nout,num_layers=4)
 loss_fn = loss
 optimizer = torch.optim.RMSprop(params=q_params_nn.parameters(),lr=learning_rate,eps=epsilon)
 
 ######################## EPOCH LOOP ########################
 x_axis,loss_list = [],[]
-for t in tqdm(range(n_epochs)):
-    train_loop(loss_fn,optimizer)
-    loss_list.append(I.item())
-    x_axis.append(t)
-    if t == n_epochs-1 or (t+1)%leap==0:
-        #print(I.item())
-        if show_periodic_plots:
-            loss_plot(x=x_axis,y=loss_list)
+if mini_batching:
+    for t in tqdm(range(n_epochs)):
+        for b in range(M//batch_size):
+            x_tensor_batch = x_tensor[b*batch_size:(b+1)*batch_size]
+            train_loop(x_tensor_batch,loss_fn,optimizer)
+            loss_list.append(I.item())
+            x_axis.append(t)
+            if t == n_epochs-1 or (t+1)%leap==0:
+                #print(error.item())
+                if show_periodic_plots:
+                    loss_plot(x=x_axis,y=loss_list)
+else:
+    for t in tqdm(range(n_epochs)):
+        train_loop(x_tensor,loss_fn,optimizer)
+        loss_list.append(I.item())
+        x_axis.append(t)
+        if t == n_epochs-1 or (t+1)%leap==0:
+            #print(I.item())
+            if show_periodic_plots:
+                loss_plot(x=x_axis,y=loss_list)
 print('\nDone! :)')
     
 if save_model:

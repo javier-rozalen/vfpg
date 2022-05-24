@@ -26,7 +26,7 @@ N = 50
 mu = 0
 sigma = 1/6
 M = 10000
-leap = M/20
+leap = M/5
 m = 1
 w = 1
 n_faulty = 100
@@ -35,6 +35,7 @@ d = 1.
 dx = 0.1
 hbar = 1.
 metropolis = True
+save_data = True
 
 ###############################################################################
 dir_support(['saved_data'])
@@ -126,11 +127,13 @@ if metropolis:
         file.close()
         file2.close()
     
-# We save the wave function data
-with open('saved_data/wf_N{N}_M{M}.txt','w') as file:
-    for x,y in zip(x_axis,wf/wf_norm):
-        file.write(str(x)+' '+str(y)+'\n')
-    file.close()
+if save_data:
+    # We save the wave function data
+    with open('saved_data/wf_N{N}_M{M}.txt','w') as file:
+        for x,y in zip(x_axis,wf/wf_norm):
+            file.write(str(x)+' '+str(y)+'\n')
+        file.close()
+    print('\nData saved at saved_data/wf_N{N}_M{M}.txt')
     
 #%% ############ <X> #############
 x,y = [],[]

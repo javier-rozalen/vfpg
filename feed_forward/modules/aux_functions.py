@@ -1,6 +1,6 @@
 import torch
 
-def train_loop(loss_fn,optimizer):
+def train_loop(train_data,loss_fn,optimizer):
     """
     Training loop.
 
@@ -17,7 +17,7 @@ def train_loop(loss_fn,optimizer):
 
     """  
     optimizer.zero_grad()
-    loss_fn().backward()
+    loss_fn(train_data).backward()
     optimizer.step()
     
 ####################### TESTS #######################
