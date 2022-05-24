@@ -9,20 +9,24 @@ from modules.plotters import loss_plot
 from modules.integration import simpson_weights
 from modules.aux_functions import train_loop
 from modules.physical_constants import *
+from modules.dir_support import dir_support
 
 ######################## PARAMETERS ########################
 # General parameters
 Nhid = 100
-n_epochs = 10000
+n_epochs = 1000
 t_0 = 0.
 t_f = 100.
 paths_file = '../MonteCarlo/saved_data/paths.txt'
 actions_file = '../MonteCarlo/saved_data/actions.txt'
-leap = n_epochs/100
+trained_models_path = 'saved_models/'
+leap = n_epochs/20
 seed = 1
+save_model = True
+show_periodic_plots = True
 
 # Training parameters
-learning_rate = 1e-4
+learning_rate = 1e-5
 epsilon = 1e-8
 smoothing_constant = 0.9
 
@@ -66,6 +70,7 @@ def loss():
     error = (1/math.sqrt(M))*torch.sqrt(I2-I**2)
     
     return I
+   
 
 ######################## NN STUFF ########################
 Nin = N
@@ -84,12 +89,21 @@ for t in tqdm(range(n_epochs)):
     train_loop(loss_fn,optimizer)
     loss_list.append(I.item())
     x_axis.append(t)
-    #print(x_axis,loss_list)
     if t == n_epochs-1 or (t+1)%leap==0:
-        print(I.item())
-        loss_plot(x=x_axis,y=loss_list)
+        #print(I.item())
+        if show_periodic_plots:
+            loss_plot(x=x_axis,y=loss_list)
 print('\nDone! :)')
     
+if save_model:
+    dir_support([trained_models_path])
+    state_dict = {'model_state_dict':q_params_nn.state_dict(),
+                 'optimizer_state_dict':optimizer.state_dict(),
+                 'Nin':Nin,
+                 'Nhid':Nhid,
+                 'Nout':Nout}
+    torch.save(state_dict,trained_models_path+'model.pt')
+    print(f'Model saved in {trained_models_path}')
     
     
     
