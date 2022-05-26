@@ -60,8 +60,8 @@ class q_phi(nn.Module):
 
         params_mu = params1
         params_sigma = self.softplus(params2)
-        sum_ = 0.5*(((x-params_mu)/params_sigma)**2)-torch.log(params_sigma)
-        return torch.sum(sum_,dim=1)-self.N/2*torch.log(torch.tensor(2*math.pi)).repeat(x.size()[0])
+        sum_ = 0.5*(((x-params_mu)/params_sigma)**2)+torch.log(params_sigma)
+        return -(torch.sum(sum_,dim=1)+self.N/2*torch.log(torch.tensor(2*math.pi)).repeat(x.size()[0]))
    
     # We set the architecture
     def forward(self, x): 
@@ -75,7 +75,7 @@ class q_phi_layers(nn.Module):
     def __init__(self,Nin,Nhid,Nout,num_layers=2):
         super(q_phi_layers,self).__init__()
         
-        self.actfun = nn.Tanh()
+        self.actfun = nn.Sigmoid()
         
         layers_mu,layers_sigma = nn.ModuleList(),nn.ModuleList()
         layers_mu.append(nn.Linear(Nin,Nhid))
@@ -113,11 +113,20 @@ class q_phi_layers(nn.Module):
 
         params_mu = params1
         params_sigma = self.softplus(params2)
-        sum_ = 0.5*(((x-params_mu)/params_sigma)**2)-torch.log(params_sigma)
-        return torch.sum(sum_,dim=1)-self.N/2*torch.log(torch.tensor(2*math.pi)).repeat(x.size()[0])
+        sum_ = 0.5*(((x-params_mu)/params_sigma)**2)+torch.log(params_sigma)
+        return -(torch.sum(sum_,dim=1)+self.N/2*torch.log(torch.tensor(2*math.pi)).repeat(x.size()[0]))
         
     def forward(self,x):
         o1 = nn.Sequential(*self.layers_mu)(x)
         o2 = nn.Sequential(*self.layers_sigma)(x)
         o = self.prod_of_gaussians(x,o1,o2)
         return o.squeeze()
+    
+    
+    
+    
+    
+    
+    
+    
+    

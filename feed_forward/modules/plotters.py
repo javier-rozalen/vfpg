@@ -1,15 +1,17 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def loss_plot(x,y):
+def loss_plot(x,y,loss,adaptive_factor,color):
     fig, ax = plt.subplots(nrows=1,ncols=1,figsize=(8,6))
     
     ax.set_xlabel('Epochs',fontsize=16)
     ax.set_ylabel('Loss',fontsize=16)
+    if adaptive_factor != 0:
+        ax.set_ylim(loss-abs(loss*adaptive_factor),loss+abs(loss*adaptive_factor))
     ax.set_title('Loss function',fontsize=18)
     ax.tick_params(axis='both',which='both',labelsize=15)
     ax.axhline(0.,linestyle='--',color='red')
-    ax.plot(x,y)
+    ax.plot(x,y,color=color)
     
     plt.pause(0.001)
     

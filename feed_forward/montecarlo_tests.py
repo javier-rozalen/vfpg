@@ -20,7 +20,9 @@ import torch
 # My Modules
 from modules.plotters import histo2
 from modules.dir_support import dir_support
+from modules.neural_networks import show_layers
 from modules.neural_networks import q_phi as neural_net
+from modules.neural_networks import q_phi_layers as neural_net_layers
 
 ################################# GENERAL PARAMETERS ##########################
 N = 50 
@@ -30,7 +32,7 @@ M = 10000
 leap = M/20
 m = 1
 w = 1
-n_faulty = 100
+n_faulty = 0
 nbins = 100
 T = 100
 d = 1.
@@ -61,13 +63,16 @@ with torch.no_grad():
     W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
     B = torch.rand(Nhid)*2.-torch.tensor(1.)
     W2 = torch.rand(Nout,Nhid,requires_grad=True) 
-    q_phi = neural_net(N,Nhid,Nout,W1,W2,B).to('cpu')
+    #q_phi = neural_net(Nin,Nhid,Nout,W1,W2,B).to('cpu')
+    q_phi = neural_net_layers(Nin,Nhid,Nout,2).to('cpu')
     q_phi.load_state_dict(torch.load(trained_model)['model_state_dict'])
+    #show_layers(q_phi)
     q_phi.eval()
 
 x0 = [torch.tensor(0.)]*N
 x0 = torch.stack(x0).unsqueeze(0)
 x0 = torch.normal(mu,sigma,size=(1,N))
+
 paths = [x0]
 q_paths = [q_phi(x0)]
 wf = np.array([0.]*nbins)
@@ -144,7 +149,7 @@ if metropolis:
                             x_axis = np.linspace(-4.95,4.95,100)
                             wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
                             histo2(x_axis,wf/wf_norm,q_paths,n_accepted,path_new.detach().numpy()[0])
-                            print(n_accepted/k)
+                            #print(n_accepted/k)
               
                 k += 1
         pbar.close()
