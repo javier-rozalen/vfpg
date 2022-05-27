@@ -21,15 +21,15 @@ import torch
 from modules.plotters import histo2
 from modules.dir_support import dir_support
 from modules.neural_networks import show_layers
-from modules.neural_networks import q_phi as neural_net
 from modules.neural_networks import q_phi_layers as neural_net_layers
 
-################################# GENERAL PARAMETERS ##########################
+#################################  PARAMETERS #################################
+# General parameters
 N = 50 
 mu = 0
 sigma = 1/6
 M = 10000
-leap = M/20
+leap = M/10
 m = 1
 w = 1
 n_faulty = 0
@@ -37,10 +37,18 @@ nbins = 100
 T = 100
 d = 1.
 hbar = 1.
-trained_model = 'saved_models/model.pt'
-paths_file = '../MonteCarlo/saved_data/paths.txt'
+
+# Trained model parameters
+Nhid = 20
+num_layers = 2
+learning_rate = 1e-2
+seed = 5
+
 metropolis = True
 expectations = False
+
+trained_model = f'saved_models/nhid{Nhid}_lr{learning_rate}_nlayers{num_layers}_seed{seed}.pt'
+paths_file = '../MonteCarlo/saved_data/paths.txt'
 
 ######################## DATA FETCHING ########################
 print('Fetching data...')
@@ -60,11 +68,7 @@ dx = 10/nbins
 # Neural Network loading
 with torch.no_grad():
     Nin,Nhid,Nout = torch.load(trained_model)['Nin'],torch.load(trained_model)['Nhid'],torch.load(trained_model)['Nout']
-    W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
-    B = torch.rand(Nhid)*2.-torch.tensor(1.)
-    W2 = torch.rand(Nout,Nhid,requires_grad=True) 
-    #q_phi = neural_net(Nin,Nhid,Nout,W1,W2,B).to('cpu')
-    q_phi = neural_net_layers(Nin,Nhid,Nout,2).to('cpu')
+    q_phi = neural_net_layers(Nin,Nhid,Nout,num_layers).to('cpu')
     q_phi.load_state_dict(torch.load(trained_model)['model_state_dict'])
     #show_layers(q_phi)
     q_phi.eval()
@@ -148,7 +152,8 @@ if metropolis:
                         if n_accepted%leap == 0:
                             x_axis = np.linspace(-4.95,4.95,100)
                             wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
-                            histo2(x_axis,wf/wf_norm,q_paths,n_accepted,path_new.detach().numpy()[0])
+                            histo2(x_axis,wf/wf_norm,q_paths,n_accepted,path_new.detach().numpy()[0],
+                                   Nhid,num_layers,learning_rate)
                             #print(n_accepted/k)
               
                 k += 1
