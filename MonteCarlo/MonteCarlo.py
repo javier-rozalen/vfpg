@@ -25,8 +25,8 @@ seed = 1
 N = 50 
 mu = 0
 sigma = 1/6
-M = 10000
-leap = M/5
+M = 100000
+leap = M/20
 m = 1
 w = 1
 n_faulty = 100
@@ -42,8 +42,8 @@ dir_support(['saved_data'])
 np.random.seed(seed)
 h = T/N
 
-x0 = np.random.normal(0,1,N).tolist()
 x0 = [0.]*N
+x0 = np.random.normal(0,1,N).tolist()
 paths = [x0]
 S_paths = [S_HO(x0,h,m,w)]
 wf = np.array([0.]*100)
@@ -121,6 +121,8 @@ if metropolis:
                             x_axis = np.linspace(-4.95,4.95,100)
                             wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
                             histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new)
+                        if n_accepted == M-1:
+                            histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new,'mc.pdf',save=True)
               
                 k += 1
         pbar.close()
