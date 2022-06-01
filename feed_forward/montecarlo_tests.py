@@ -29,20 +29,20 @@ N = 50
 mu = 0
 sigma = 1/6
 M = 10000
-leap = M/10
+leap = M/100
 m = 1
 w = 1
-n_faulty = 0
+n_faulty = 200
 nbins = 100
 T = 100
 d = 1.
 hbar = 1.
 
 # Trained model parameters
-Nhid = 20
+Nhid = 30
 num_layers = 2
 learning_rate = 1e-2
-seed = 5
+seed = 7
 
 metropolis = True
 expectations = False
@@ -73,10 +73,10 @@ with torch.no_grad():
     #show_layers(q_phi)
     q_phi.eval()
 
+
+x0 = torch.normal(mu,sigma,size=(1,N))
 x0 = [torch.tensor(0.)]*N
 x0 = torch.stack(x0).unsqueeze(0)
-x0 = torch.normal(mu,sigma,size=(1,N))
-
 paths = [x0]
 q_paths = [q_phi(x0)]
 wf = np.array([0.]*nbins)
@@ -126,8 +126,8 @@ if metropolis:
                 path_old = paths[-1]
                 path_new = path_old+d*chi
                 path_new[-1]=path_new[0]
-                S_new = q_phi(path_new)
-                S_old = q_phi(path_old)
+                S_new = q_phi(path_new)[0]
+                S_old = q_phi(path_old)[0]
                 A = min([1,S_new.item()/S_old.item()])
                 u = torch.rand(1)
                 
@@ -152,7 +152,7 @@ if metropolis:
                         if n_accepted%leap == 0:
                             x_axis = np.linspace(-4.95,4.95,100)
                             wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
-                            histo2(x_axis,wf/wf_norm,q_paths,n_accepted,path_new.detach().numpy()[0],
+                            histo2(x_axis,wf/wf_norm,q_paths,q_phi(path_new)[1].detach(),q_phi(path_new)[2].detach(),n_accepted,path_new.detach().numpy()[0],
                                    Nhid,num_layers,learning_rate)
                             #print(n_accepted/k)
               

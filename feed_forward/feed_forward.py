@@ -26,22 +26,22 @@ trained_models_path = 'saved_models/'
 trained_plots_path = 'saved_plots/'
 
 # Training parameters
-n_epochs = 10000
-Nhid = 100
-num_layers = 3
+n_epochs = 5000
+Nhid = 30
+num_layers = 2
 batch_size = 1000
 learning_rate = 1e-2
 epsilon = 1e-8
 smoothing_constant = 0.9
-seed = 5
+seed = 10
 
 # Plotting parameters
 adaptive_factor = 2.5
 leap = n_epochs/10
 
 # Saves/Booleans
-save_model = True
-save_plot = True
+save_model = False
+save_plot = False
 show_periodic_plots = True
 mini_batching = False
 continue_from_last = False
@@ -64,6 +64,8 @@ x_tensor = torch.stack(path_manifold)
 S_tensor = torch.stack(S_manifold)
 M = len(path_manifold)
 N = len(path_manifold[0])
+
+x_tensor = torch.cat([i.view(N,1,-1) for i in x_tensor])
 print('Data fetching complete.\n')
 
 ######################## LOSS FUNCTION ########################
@@ -78,8 +80,10 @@ def loss(train_data):
 
     """
     global I,I2,error,logq_tensor
+    global params_mu,params_sigma
     
-    logq_tensor = q_params_nn(train_data)
+    output = q_params_nn(train_data)
+    logq_tensor,params_mu,params_sigma = output[0],output[1],output[2]
     
     # Monte Carlo integration 
     M = len(train_data)
@@ -96,8 +100,8 @@ torch.manual_seed(seed)
 W1 = torch.rand(Nhid,Nin,requires_grad=True)*(-1.)
 B = torch.rand(Nhid)*2.-torch.tensor(1.)
 W2 = torch.rand(Nout,Nhid,requires_grad=True) 
-#q_params_nn = q_phi(Nin,Nhid,Nout,W1,W2,B)
 q_params_nn = q_phi_layers(Nin,Nhid,Nout,num_layers=num_layers)
+q_params_nn = q_phi_rnn(N=N,input_size=1,hidden_size=2*N,num_layers=1,Dense=False)
 loss_fn = loss
 optimizer = torch.optim.RMSprop(params=q_params_nn.parameters(),lr=learning_rate,eps=epsilon)
 
@@ -119,7 +123,12 @@ if not os.path.exists(trained_models_path+model_name+'.pt'):
                 x_axis.append(t)
                 if t == n_epochs-1 or (t+1)%leap==0:
                     if show_periodic_plots:
-                        loss_plot(x=x_axis,y=loss_list)
+                        color = 'blue' if error<=eps/100 else 'red'
+                        loss_plot(x_axis,loss_list,x_tensor,params_mu,params_sigma,I.item(),adaptive_factor,error,color,save=False)
+                if save_plot and t == n_epochs-1:
+                    dir_support([trained_plots_path])
+                    loss_plot(x_axis,loss_list,x_tensor,params_mu,params_sigmaI.item(),adaptive_factor,error,color,save=True,
+                              model_name=trained_plots_path+model_name+'.png')
     else:
         for t in tqdm(range(n_epochs)):
             train_loop(x_tensor,loss_fn,optimizer)
@@ -128,10 +137,10 @@ if not os.path.exists(trained_models_path+model_name+'.pt'):
             if t == n_epochs-1 or (t+1)%leap==0:
                 if show_periodic_plots:
                     color = 'blue' if error<=eps/100 else 'red'
-                    loss_plot(x_axis,loss_list,I.item(),adaptive_factor,color,save=False)
+                    loss_plot(x_axis,loss_list,x_tensor,params_mu.detach(),params_sigma.detach(),I.item(),adaptive_factor,error,color,save=False)
             if save_plot and t == n_epochs-1:
                 dir_support([trained_plots_path])
-                loss_plot(x_axis,loss_list,I.item(),adaptive_factor,color,save=True,
+                loss_plot(x_axis,loss_list,x_tensor,params_mu,params_sigma,I.item(),adaptive_factor,error,color,save=True,
                           model_name=trained_plots_path+model_name+'.png')
     print('\nDone! :)')
     if save_plot:
@@ -141,6 +150,7 @@ if not os.path.exists(trained_models_path+model_name+'.pt'):
         dir_support([trained_models_path])
         state_dict = {'model_state_dict':q_params_nn.state_dict(),
                      'optimizer_state_dict':optimizer.state_dict(),
+                     'epochs':n_epochs,
                      'Nin':Nin,
                      'Nhid':Nhid,
                      'Nout':Nout}
