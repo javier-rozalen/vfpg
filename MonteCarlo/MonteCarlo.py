@@ -22,20 +22,20 @@ from modules.dir_support import dir_support
 
 ################################# GENERAL PARAMETERS ##########################
 seed = 1
-N = 50 
+N = 30
 mu = 0
 sigma = 1/6
-M = 100000
-leap = M/20
+M = 10000
+leap = M/5
 m = 1
 w = 1
-n_faulty = 100
+n_faulty = 300
 T = 100
 d = 1.
 dx = 0.1
 hbar = 1.
 metropolis = True
-save_data = True
+save_data = False
 
 ###############################################################################
 dir_support(['saved_data'])
@@ -122,7 +122,7 @@ if metropolis:
                             wf_norm = integrate.simpson(y=wf,x=np.linspace(-4.95,4.95,100))
                             histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new)
                         if n_accepted == M-1:
-                            histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new,'mc.pdf',save=True)
+                            histo2(x_axis,wf/wf_norm,S_paths,n_accepted,path_new,'mc.pdf',save=False)
               
                 k += 1
         pbar.close()

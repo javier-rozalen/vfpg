@@ -77,7 +77,7 @@ def histo(paths,paths_sym,S_paths,M,N,seed,plot_name='',save=False):
         print(f'Plot saved {plot_name}.')
     plt.show()
     
-def histo2(x_axis,y_axis,S_paths,n_accepted,path):
+def histo2(x_axis,y_axis,S_paths,n_accepted,path,plot_name='',save=False):
     fig, axes = plt.subplots(nrows=2,ncols=2,figsize=(14,10))
     
     # Wave function
@@ -113,5 +113,8 @@ def histo2(x_axis,y_axis,S_paths,n_accepted,path):
     for x in x_axis:
         ax.axvline(x)
         
-    
+    if save:
+        plt.savefig(plot_name)
+        print(f'Plot saved {plot_name}.')
     plt.show()
+        

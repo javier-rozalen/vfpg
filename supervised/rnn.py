@@ -18,7 +18,7 @@ from modules.dir_support import dir_support
 
 ######################## PARAMETERS ########################
 # General parameters
-N = 32
+N = 15
 M = 10000
 t_0 = 0.
 t_f = 100.
@@ -30,13 +30,14 @@ trained_models_path = 'saved_models/rnn/'
 trained_plots_path = 'saved_plots/rnn/'
 
 # Training parameters
-n_epochs = 10000
+pdf = 'iidg' # 'gmm', 'iidg'
+n_epochs = 5000
 input_size = 1
-num_layers = 1
+num_layers = 2
 learning_rate = 1e-3
 epsilon = 1e-8
 smoothing_constant = 0.9
-seed = 3
+seed = 1
 
 # Plotting parameters
 adaptive_factor = 0. # Set to 0. when no adaptive limits are wanted
@@ -51,7 +52,7 @@ show_periodic_plots = True
 mini_batching = False
 continue_from_last = False
 
-model_name = f'M{M}_N{N}_num_layers{num_layers}_Dense{Dense}_lr{learning_rate}_seed{seed}'
+model_name = f'N{N}_M{M}_num_layers{num_layers}_Dense{Dense}_lr{learning_rate}_seed{seed}'
 ######################## DATA FETCHING ########################
 print('Fetching data...')
 path_manifold,S_manifold = [],[]
@@ -99,7 +100,7 @@ def loss(train_data):
    
 ######################## NN STUFF ########################
 torch.manual_seed(seed)
-hidden_size = 2*input_size
+hidden_size = 2*input_size if pdf=='iidg' else 3*input_size
 q_params_nn = q_phi_rnn(input_size,hidden_size,num_layers,Dense)
 ### Explanation of the inputs
 # N --> length of the sequence (path)
