@@ -6,15 +6,10 @@ sys.path.append('.')
 
 import numpy as np
 from tqdm import tqdm
-import torch,math
+import torch, math
 
 # My modules
 from modules.neural_networks import *
-from modules.plotters import loss_plot
-from modules.integration import simpson_weights
-from modules.aux_functions import train_loop
-from modules.physical_constants import *
-from modules.dir_support import dir_support
 
 ####################### PARAMETERS ################################
 seed = 1
@@ -27,7 +22,7 @@ Dense = False
 
 ####################### CODE ################################
 torch.manual_seed(seed)
-a = torch.randn(n_samples,N,input_size)
+a = torch.randn(n_samples, N, input_size)
 e1 = [[ 0.6614],
          [ 0.2669],
          [ 0.0617],
@@ -52,7 +47,7 @@ b = torch.stack(b)
 print(f'Input: {b}\n')
 print(f'Size of the input: {b.size()}\n')
 
-q_params_nn = q_phi_rnn(input_size,hidden_size,num_layers,Dense)
+q_params_nn = q_phi_rnn(input_size, hidden_size, num_layers, Dense)
 ### Explanation of the inputs
 # N --> length of the sequence (path)
 # input_size --> number of features / dimensions of each element of the sequence (path)

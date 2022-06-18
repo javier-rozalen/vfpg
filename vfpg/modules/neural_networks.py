@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Apr 19 00:02:23 2022
 
-@author: javir
-"""
 import torch
 from torch import nn
 from torch.distributions.categorical import Categorical
@@ -117,46 +113,60 @@ class VFPG(nn.Module):
         
         self.N = N
         self.Nc = Nc
-        self.input_size = input_size
-        self.Dense_bool = Dense
         
-        # Layers    
-        self.lstm = nn.LSTM(input_size=input_size,hidden_size=hidden_size,num_layers=num_layers)
-        if self.Dense_bool:
-            self.Dense = nn.Linear(in_features=hidden_size,out_features=3*Nc)
-        self.softmax = nn.Softmax(dim=0)
-        self.softplus = nn.Softplus()
+    def gaussian_mixture(self,t,x,params):
+        global params_gamma,params_mu,params_sigma,gammas,mus_max_indx
+        """
+        Computes a pdf that is a gaussian mixture given the weights, means and stdevs.
+        The return is the logarithm of the pdf. 
+        
+        Parameters
+        ----------
+        t: tensor
+            lablels to learn
+        x : tensor
+            input vector of the network.
+        params : tensor
+            means and stdevs of the product of gaussians.
+
+        Returns
+        -------
+        tensor
+            q_phi.
+            
+        """
+        
+        N = t.size()[1]
+        gammas,mus,phis,M = [],[],[],params.size()[0]
+        #print(f'M: {M}')
+        for i in range(self.Nc):
+            gc = params[:,i*(N+2):(i+1)*(N+2)]
+            params_mu = gc[:,:N] # [M,Nc]
+            params_gamma = gc[:,N:N+1] # [M,Nc*N]
+            params_sigma = torch.exp(gc[:,N+1:N+2]) # [M,Nc]
+            
+            phi_prime = torch.exp(-0.5*torch.sum((t-params_mu)**2,dim=1)/params_sigma.squeeze(1)**2)
+            phi = phi_prime / (((2*self.pi)**(N/2))*(params_sigma.squeeze(1)**N))
+            gammas.append(params_gamma)
+            mus.append(params_mu)
+            phis.append(phi)
+        
+        gammas,mus,phis = self.softmax(torch.stack(gammas)),torch.stack(mus),torch.stack(phis)
+        _,idcs = torch.max(gammas,0,keepdim=True)
+        if self.Nc >1:
+            mus_max_indx = torch.stack([mus[i][j] for i,j in zip(idcs.view(M),range(M))])
+        else:
+            mus_max_indx = mus
+        
+        gammas = gammas.view(M,1,self.Nc)
+        phis = phis.view(M,self.Nc,1)
+        q = torch.bmm(gammas,phis).squeeze(2)
+
+        return q        
         
     def forward(self,z):
-        inputs = torch.cat([z for _ in range(self.N)]).view(self.N,1,-1) # Repeat
-        lstm_out, _ = self.lstm(inputs)
-        x,q_params = [],{'gamma':[],'mu':[],'sigma':[]}
-        c = 0
-        for lstm_out_i in lstm_out:
-            # GMM parameters
-            GMM_params = self.Dense(lstm_out_i) if self.Dense_bool else lstm_out_i
-         
-            # Adequate transformations
-            gamma = self.softmax(GMM_params[0][:self.Nc]) # 0<=gamma<=1, sum(gamma)=1
-            mu = GMM_params[0][self.Nc:2*self.Nc]
-            sigma = self.softplus(GMM_params[0][2*self.Nc:3*self.Nc]) # sigma>0
             
-            # We store the parameters
-            q_params['gamma'].append(gamma)
-            q_params['mu'].append(mu)
-            q_params['sigma'].append(sigma)
-
-            # Sampling from mixture density
-            gamma_cat_dist = Categorical(gamma)
-            g_sampled_idx = gamma_cat_dist.sample()
-
-            g = torch.randn(1,dtype=torch.float32)
-            x_k = sigma[g_sampled_idx]*g+mu[g_sampled_idx]
-            x.append(x_k.detach())
-
-            c += 1
-            
-        return x,q_params
+        return o
 
 ####################### TESTS #######################
 if __name__ == '__main__':    

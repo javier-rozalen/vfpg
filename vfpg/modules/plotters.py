@@ -31,10 +31,11 @@ def pic_creator(bound,j):
     ax1.set_title('Loss',fontsize=17)
     ax1.set_xlabel('Epoch',fontsize=17)
     ax1.tick_params(axis='both',labelsize=15)
-    ax1.plot([e for e in range(j+1)],loss_list,label='$\mathcal{L}$')
-    ax1.plot([e for e in range(j+1)],loss_kl_list,label='$\mathcal{L}_{KL}-lnZ$')
-    ax1.plot([e for e in range(j+1)],loss_i_list,label='$\mathcal{L}_i$')
-    ax1.plot([e for e in range(j+1)],loss_f_list,label='$\mathcal{L}_f$')    
+    x = [e for e in range(j+1)]
+    ax1.plot(x,loss_list,label='$\mathcal{L}$')
+    ax1.plot(x,loss_kl_list,label='$\mathcal{L}_{KL}-lnZ$')
+    ax1.plot(x,loss_i_list,label='$\mathcal{L}_i$')
+    ax1.plot(x,loss_f_list,label='$\mathcal{L}_f$')    
     ax1.axhline(0.,color='red',linestyle='dashed')
     ax1.legend(fontsize=16)
     
