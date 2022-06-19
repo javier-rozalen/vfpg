@@ -3,10 +3,12 @@ import torch,math
 from torch import nn
 import matplotlib.pyplot as plt
 import numpy as np
+from modules.physical_constants import m, w, hbar
+from modules.lagrangians import L_HO
 ###########################
 
 ############################ AUXILIARY FUNCTIONS ##############################
-def loss_DKL(model,train_set=0,target_set=0):
+def loss_DKL(model, train_set=0, target_set=0, h=1):
     """
     Loss function.
 
@@ -17,23 +19,30 @@ def loss_DKL(model,train_set=0,target_set=0):
 
     """
     
-    # We sample the paths, their probs and their actions 
-    x,q_params = model(train_set)
+    # We sample the paths and their probs
+    paths, paths_cond_probs = model(train_set) # paths.size() = [M, N]
     
-    # Monte Carlo
-    M = x.size()[0]
-    I = (1/M)*torch.sum(logp-logp_nn)
+    # We compute the actions of all the paths
+    M = torch.tensor(paths.size()[0])
+    S_paths = []
+    for path in paths:
+        #print(path)
+        L_path = L_HO(path, h, m, w) # lagrangian of the path
+        #print(h.repeat(path.size(0)))
+        S_path = torch.dot(L_path, h.repeat(path.size(0))) # Action of the path
+        #print(S_path)
+        S_paths.append(S_path)
+    S_paths = torch.stack(S_paths).squeeze()
+    #print(f'S_paths: {S_paths}')
     
-    # Endpoints constraints
-    sumand_i = (q_params['mu'][0]-torch.tensor(x_i))**2+q_params['sigma'][0]**2
-    sumand_f = (q_params['mu'][-1]-torch.tensor(x_f))**2+q_params['sigma'][-1]**2
-    
-    loss_kl = I
-    loss_i = N*torch.sum(sumand_i)
-    loss_f = N*torch.sum(sumand_f)
-    
-    loss = loss_kl+loss_i+loss_f
-    return loss
+    # Monte Carlo estimate of KL divergence
+    #print(f'Sum of logs: {torch.sum(torch.log(paths_cond_probs), dim=1)}')
+    f = (1/hbar)*S_paths + torch.sum(torch.log(paths_cond_probs), dim=1)
+    loss_KL = (1/M)*torch.sum(f)
+    MC_err = torch.sqrt((1/M)*torch.sum(f**2)-loss_KL**2) / torch.sqrt(M)
+    #print(f'loss_KL: {loss_KL}')
+
+    return loss_KL, MC_err, paths
     
     
     
