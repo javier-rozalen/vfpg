@@ -3,8 +3,18 @@
 import torch
 from torch import nn
 from torch.distributions.categorical import Categorical
-#from torch.distributions.normal import Normal
+from torch.distributions.normal import Normal
 import numpy as np
+from torch.autograd import Variable
+
+############################ AUXILIARY FUNCTIONS ##############################
+def show_layers(model):
+    print("\nLayers and parameters:\n")
+    for name, param in model.named_parameters():
+        print(f"Layer: {name} | Size: {param.size()} | Values : {param[:100]} \n")
+        
+def count_params(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 class VFPG_old(nn.Module):
     """
@@ -83,8 +93,8 @@ class VFPG_old(nn.Module):
 ###############################################################################
 class VFPG(nn.Module):
 
-    def __init__(self, M, N, input_size, nhid, hidden_size, num_layers, 
-                 Dense=True):
+    def __init__(self, M, N, input_size, nhid, hidden_size, out_size, 
+                 num_layers, Dense=True):
         super(VFPG, self).__init__()
         
         # Auxiliary stuff
@@ -94,21 +104,22 @@ class VFPG(nn.Module):
         self.nhid = nhid # number of hidden neurons 
         self.num_layers = num_layers
         self.hidden_size = hidden_size
-        self.Nc = int(hidden_size / (input_size + 2))
+        self.Nc = int(out_size / (input_size + 2))
         self.Dense = Dense
         self.pi = torch.tensor(np.pi)
         self.softmax = nn.Softmax(dim=0)
         
         # Neural Network
-        self.lstm = nn.LSTM(input_size=input_size, 
+        self.lstm = nn.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
-                            num_layers=num_layers, 
+                            num_layers=num_layers,
                             batch_first=True)
         self.fc = nn.Linear(in_features=hidden_size, 
-                            out_features=hidden_size,                                                   
+                            out_features=out_size,                                                   
                             bias=True)
-        
+
     def GMM(self, params):    
+        # params.shape = [M,(N+2)*Nc]
         N = self.input_size
         gammas, mus, sigmas = [], [], []
         for i in range(self.Nc):
@@ -121,7 +132,9 @@ class VFPG(nn.Module):
             mus.append(params_mu)
             sigmas.append(params_sigma)
         
+        #print(f'Gammas before softmax: {torch.stack(gammas)}')
         gammas = self.softmax(torch.stack(gammas))
+        #print(f'Gammas after softmax: {gammas}')
         mus = torch.stack(mus)
         sigmas = torch.exp(torch.stack(sigmas))
 
@@ -131,6 +144,7 @@ class VFPG(nn.Module):
         
         # Sampling from the mixture density
         _gammas = gammas.squeeze(2).transpose(0, 1)
+        print(_gammas)
         _mus = mus.squeeze(2).transpose(0, 1)
         _sigmas = sigmas.squeeze(2).transpose(0, 1)
         gamma_cat_dist = Categorical(_gammas)
@@ -142,11 +156,12 @@ class VFPG(nn.Module):
             _chosen_sigmas.append(_sigmas[i][idx].unsqueeze(0))
         _chosen_mus = torch.stack(_chosen_mus)
         _chosen_sigmas = torch.stack(_chosen_sigmas)
-        g = torch.randn(1)
-        x_pred = _chosen_mus + g*_chosen_sigmas
+        print(f'_chosen_mus: {_chosen_mus}')
+        gmm_dist = Normal(loc=_chosen_mus, scale=_chosen_sigmas)
+        x_pred = gmm_dist.sample()
     
         # Computing the probability of the sample
-        x_pred_rep = x_pred.repeat(1, 3)
+        x_pred_rep = x_pred.repeat(1, self.Nc)
         kernels_exponent = (x_pred_rep - _mus)**2
         kernels = torch.exp(-0.5*kernels_exponent) / (_sigmas**2)
         kernels /= ((2*self.pi)**(self.N/2))*(_sigmas**self.N)
@@ -171,33 +186,30 @@ class VFPG(nn.Module):
         return x_pred.unsqueeze(2), x_cond_prob 
         
     def forward(self, x_prev):
-        preds, cond_probs = [], []
+        preds, cond_probs = [x_prev], [torch.ones(self.M, 1)]
         
         # Initial cell states
         h_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
         c_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
         
         # Recurrence loop
-        for i in range(self.N):
+        for i in range(self.N - 1):
             """
             print(f'\nIteration {i+1}/{self.N}\n-------------------')
-            print(f'x_prev: {x_prev}')
+            print(f'x_prev: {x_prev}', x_prev.size())
             print(f'h_t: {h_t}', h_t.size())
             print(f'c_t: {c_t}', c_t.size())
             """
-            h_t, c_t = self.lstm(x_prev, (h_t, c_t))
-            y = self.fc(h_t) if self.Dense else h_t
+            h_last_layer, (h_t, c_t) = self.lstm(x_prev, (h_t, c_t))
+            y = self.fc(h_last_layer) if self.Dense else h_last_layer
             gammas, mus, sigmas = self.GMM(y.squeeze(1))
-            x_pred, x_prob = self.GMM_sampler(gammas, mus, sigmas)
+            x_pred, x_cond_prob = self.GMM_sampler(gammas, mus, sigmas)
             preds.append(x_pred)
-            cond_probs.append(x_prob)
+            cond_probs.append(x_cond_prob)
             x_prev = x_pred 
-            h_t = h_t.view(1, self.M, -1)
-            c_t = c_t[0]
         
-        paths = torch.stack(preds).squeeze().transpose(0, 1)
-        paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0, 1)
-        #paths_probs = torch.prod(paths_probs, dim=1)
+        paths = torch.stack(preds).squeeze().transpose(0,1)
+        paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0,1)
         """
         print(f'Paths: {paths}')
         print(f'Paths_cond_probs: {paths_cond_probs}')

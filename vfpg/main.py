@@ -17,7 +17,7 @@ from torch.distributions.normal import Normal
 
 # My modules
 #from modules.physical_constants import *
-from modules.neural_networks import VFPG
+from modules.neural_networks import VFPG, show_layers, count_params
 from modules.loss_functions import loss_DKL
 from modules.aux_functions import train_loop
 from modules.lagrangians import L_HO
@@ -25,8 +25,8 @@ from modules.plotters import loss_paths_plot
 
 ############################# GENERAL PARAMETERS #############################
 # General parameters
-M = 500 # number of paths (for Monte Carlo estimates)
-N = 32 # length of the path
+M = 5 # number of paths (for Monte Carlo estimates)
+N = 4 # length of the path
 Nc = 3 # number of gaussian components
 
 x_i = 0.
@@ -38,13 +38,17 @@ h = t[1]-t[0]
 
 # Neural network parameters
 input_size = 1 # dimension of the input 
-nhid = 10
-hidden_size = (input_size + 2)*Nc # dimension of the LSTM output vector
+nhid = 6 # number of hidden neurons
+hidden_size = 7 # dimension of the LSTM hidden state vector
+out_size = (input_size + 2)*Nc # size of the LSTM output, y
 num_layers = 1 # number of stacked LSTM layers
 Dense = True # controls wether there is a Linear layer after the LSTM or not
+# Input to LSTM: M sequences, each of length 1, elements of dim input_size
+z = 6.*torch.rand(M, 1, input_size)-torch.tensor(3.).repeat(M, 1, input_size)
+#z = torch.zeros(M, 1, input_size)
 
 # Hyperparameters
-learning_rate = 1e-4
+learning_rate = 1e-3
 epsilon = 1e-8
 smoothing_constant = 0.9
 
@@ -53,7 +57,7 @@ n_epochs = 5000
 mini_batching = False
 
 # Plotting parameters
-n_plots = 10
+n_plots = 50
 leap = n_epochs/n_plots
 bound = 10
 show_periodic_plots = True
@@ -64,15 +68,17 @@ save_model = False
 torch.manual_seed(1)
 
 ############################# NEURAL NETWORK #############################
+hidden_size = hidden_size if Dense else out_size
 vfpg = VFPG(M=M,
             N=N, 
             input_size=input_size, 
             nhid=nhid,
             hidden_size=hidden_size, 
+            out_size=out_size,
             num_layers=num_layers, 
             Dense=Dense)    
 
-optimizer = torch.optim.RMSprop(params=vfpg.parameters(), 
+optimizer = torch.optim.Adam(params=vfpg.parameters(), 
                                 lr=learning_rate, 
                                 eps=epsilon)
 
@@ -84,8 +90,6 @@ loss_KL_list = []
 for j in tqdm(range(n_epochs)):
     #print('\n')
     # Train loop
-    # Input to LSTM: M sequences, each of length 1, elements of dim input_size
-    z = torch.randn(M, 1, input_size) 
     #Lprint(f'\nInput to LSTM at epoch {j}: {z}', z.size())
     L, delta_L, paths = train_loop(model=vfpg, 
                                    loss_fn=loss_fn, 
@@ -96,7 +100,7 @@ for j in tqdm(range(n_epochs)):
     # Loss tracking
     loss_KL_list.append(L.item())
     
-    # Periodic plots + console info
+    # Periodic plots
     if (j+1)%leap == 0 and show_periodic_plots:
         loss_paths_plot(bound=bound,
                         time_grid=t, 

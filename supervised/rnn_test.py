@@ -47,7 +47,8 @@ b = torch.stack(b)
 print(f'Input: {b}\n')
 print(f'Size of the input: {b.size()}\n')
 
-q_params_nn = q_phi_rnn(input_size, hidden_size, num_layers, Dense)
+q_params_nn = q_phi_rnn(input_size=input_size, hidden_size=hidden_size,
+                        num_layers=num_layers, Dense=Dense)
 ### Explanation of the inputs
 # N --> length of the sequence (path)
 # input_size --> number of features / dimensions of each element of the sequence (path)

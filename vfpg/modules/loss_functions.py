@@ -37,7 +37,9 @@ def loss_DKL(model, train_set=0, target_set=0, h=1):
     
     # Monte Carlo estimate of KL divergence
     #print(f'Sum of logs: {torch.sum(torch.log(paths_cond_probs), dim=1)}')
-    f = (1/hbar)*S_paths + torch.sum(torch.log(paths_cond_probs), dim=1)
+    q_phi = torch.sum(torch.log(paths_cond_probs), dim=1)
+    #print(q_phi)
+    f = (1/hbar)*S_paths + q_phi
     loss_KL = (1/M)*torch.sum(f)
     MC_err = torch.sqrt((1/M)*torch.sum(f**2)-loss_KL**2) / torch.sqrt(M)
     #print(f'loss_KL: {loss_KL}')
