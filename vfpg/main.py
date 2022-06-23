@@ -6,21 +6,15 @@ initial_dir = pathlib.Path(__file__).parent.resolve()
 os.chdir(initial_dir)
 sys.path.append('.')
 
-import torch, math, time
-from torch import nn
-import matplotlib.pyplot as plt
+import torch
 import numpy as np
 from tqdm import tqdm
-from torch.autograd import grad
-from torch.distributions.categorical import Categorical
-from torch.distributions.normal import Normal
 from scipy import integrate
 
 # My modules
-#from modules.physical_constants import *
-from modules.neural_networks import *
+from modules.neural_networks import VFPG_ours, VFPG_theirs
 from modules.loss_functions import loss_DKL, loss_MSE
-from modules.aux_functions import *
+from modules.aux_functions import count_params, show_layers, train_loop, histogram
 from modules.plotters import loss_paths_plot
 
 ############################# GENERAL PARAMETERS #############################
@@ -30,19 +24,19 @@ N = 32 # length of the path
 Nc = 3 # number of gaussian components
 
 t_0 = 0.
-t_f = 100.
+t_f = 100
 t = [torch.tensor(e) for e in np.linspace(t_0, t_f, N)]
 h = t[1] - t[0]
 
 # Neural network parameters
 input_size = 1 # dimension of the input 
-nhid = 6 # number of hidden neurons
-hidden_size = 7 # dimension of the LSTM hidden state vector
+nhid = 10 # number of hidden neurons
+hidden_size = 10 # dimension of the LSTM hidden state vector
 out_size = (input_size + 2)*Nc # size of the LSTM output, y
-num_layers = 1 # number of stacked LSTM layers
+num_layers = 2 # number of stacked LSTM layers
 Dense = True # controls wether there is a Linear layer after the LSTM or not
 # Input to LSTM: M sequences, each of length 1, elements of dim input_size
-z = 6.*torch.rand(M, 1, input_size)-torch.tensor(3.).repeat(M, 1, input_size)
+z = 3 * (2*torch.rand(M, 1, input_size)-torch.ones(M, 1, input_size))
 #z = torch.zeros(M, 1, input_size)
 
 # Hyperparameters
@@ -69,7 +63,7 @@ dx_list = [dx for e in range(M)]
 
 ############################# NEURAL NETWORK #############################
 hidden_size = hidden_size if Dense else out_size
-vfpg = VFPG_optimized(M=M,
+vfpg = VFPG_ours(M=M,
             N=N, 
             input_size=input_size, 
             nhid=nhid,
@@ -78,7 +72,7 @@ vfpg = VFPG_optimized(M=M,
             num_layers=num_layers, 
             Dense=Dense)    
 
-optimizer = torch.optim.Adam(params=vfpg.parameters(), 
+optimizer = torch.optim.RMSprop(params=vfpg.parameters(), 
                                 lr=learning_rate, 
                                 eps=epsilon)
 
@@ -117,9 +111,9 @@ for j in tqdm(range(n_epochs)):
                         wf=wf,
                         current_epoch=j, 
                         loss_list=loss_KL_list,
-                        delta_L = delta_L)
+                        delta_L=delta_L)
         
-print(f'Done! :)')
+print('\nDone! :)')
 
 # Save the model
 if save_model:

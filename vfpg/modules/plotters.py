@@ -25,7 +25,6 @@ def loss_paths_plot(bound, time_grid, path_manifold, wf, current_epoch,
     x_target = np.linspace(-3, 3, 200)
     y_target = (((1/(np.pi*sigma**2))**(1/4))*np.exp(-x_target**2/(2*sigma**2)))**2
     ax1.hist(x_axis_hist, weights=wf, bins=int(len(x_axis_hist)))
-    #ax.plot(x_axis,y_axis,linestyle='none',marker='o')
     ax1.plot(x_target,y_target,label='$|\Psi_0(x)|^2,\quad\sigma=1$')
     ax1.set_xlim(-3, 3)
     ax1.set_ylabel('$|\Psi(x)|^2$', fontsize=17)
@@ -39,10 +38,7 @@ def loss_paths_plot(bound, time_grid, path_manifold, wf, current_epoch,
     ax3.set_ylabel(r'$\tau$', fontsize=17)
     ax3.set_xlim(-4, 4)
     ax3.tick_params(axis='both', labelsize=15)
-    #print(path_manifold)
     for path in path_manifold[:bound]:
-        #print(f'\nTime grid: {time_grid}')
-        #print(f'Single path: {path.detach()}')
         ax3.plot(path.detach(), time_grid)
         
     plt.show()

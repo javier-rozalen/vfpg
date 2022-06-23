@@ -81,11 +81,11 @@ class VFPG_old(nn.Module):
         return x, q_params
 
 ###############################################################################
-class VFPG(nn.Module):
+class VFPG_suboptimal(nn.Module):
 
     def __init__(self, M, N, input_size, nhid, hidden_size, out_size, 
                  num_layers, Dense=True):
-        super(VFPG, self).__init__()
+        super(VFPG_suboptimal, self).__init__()
         
         # Auxiliary stuff
         self.M = M
@@ -209,11 +209,11 @@ class VFPG(nn.Module):
         """
         return paths, paths_cond_probs
 
-class VFPG_optimized(nn.Module):
+class VFPG_ours(nn.Module):
 
     def __init__(self, M, N, input_size, nhid, hidden_size, out_size, 
                  num_layers, Dense=True):
-        super(VFPG_optimized, self).__init__()
+        super(VFPG_ours, self).__init__()
         
         # Auxiliary stuff
         self.M = M
@@ -281,18 +281,91 @@ class VFPG_optimized(nn.Module):
             x_pred, x_cond_prob = self.GMM_sampler(gammas, mus, sigmas)
             preds.append(x_pred)
             cond_probs.append(x_cond_prob)
-            x_prev = x_pred 
+            x_prev = x_pred
+            x_prev = torch.randn(self.M, 1, self.input_size) 
         
         # We close the paths
         preds.append(preds[0])
-        cond_probs.append(torch.ones(self.M, 1))
+        cond_probs.append(cond_probs[0])
         paths = torch.stack(preds).squeeze().transpose(0,1)
         paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0,1)
-        """
-        print(f'Paths: {paths}')
-        print(f'Paths_cond_probs: {paths_cond_probs}')
-        """
+
         return paths, paths_cond_probs
+    
+class VFPG_theirs(nn.Module):
+
+    def __init__(self, M, N, input_size, nhid, hidden_size, out_size, 
+                 num_layers, Dense=True):
+        super(VFPG_theirs, self).__init__()
+        
+        # Auxiliary stuff
+        self.M = M
+        self.N = N # length of each path
+        self.input_size = input_size
+        self.nhid = nhid # number of hidden neurons 
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.Nc = int(out_size / (input_size + 2))
+        self.Dense = Dense
+        self.pi = torch.tensor(np.pi)
+        self.softmax = nn.Softmax(dim=1)
+        
+        # Neural Network
+        self.lstm = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
+        self.fc = nn.Linear(in_features=hidden_size, 
+                            out_features=out_size,                                                   
+                            bias=True)
+
+    def GMM(self, params):    
+        # params size = [M, (N+2)*Nc]
+        
+        gammas = self.softmax(params[:, :self.Nc]) # size [M, Nc]
+        sigmas = torch.exp(params[:, self.Nc:2*self.Nc]) # size [M, Nc]
+        mus = params[:, 2*self.Nc:] # size [M, N*Nc]
+
+        return gammas, mus, sigmas 
+    
+    def GMM_sampler(self, gammas, mus, sigmas):
+        
+        # Sampling from the mixture density
+        g_sampled_idcs = Categorical(gammas).sample().unsqueeze(1)
+        chosen_mus = mus.gather(1, g_sampled_idcs)
+        chosen_sigmas = sigmas.gather(1, g_sampled_idcs)
+        gmm_dist = Normal(loc=chosen_mus, scale=chosen_sigmas)
+        x_pred = gmm_dist.sample()
+    
+        # Computing the probability of the sample
+        x_pred_rep = x_pred.repeat(1, self.Nc)
+        kernels_exponent = (x_pred_rep - mus)**2
+        kernels = torch.exp(-0.5*kernels_exponent) / (sigmas**2)
+        kernels /= ((2*self.pi)**(self.N/2))*(sigmas**self.N)
+        
+        gammas = gammas.view(self.M, 1, self.Nc)
+        kernels = kernels.view(self.M, self.Nc, 1)
+        x_cond_prob = torch.bmm(gammas, kernels).squeeze(2)
+
+        return x_pred.unsqueeze(2), x_cond_prob 
+        
+    def forward(self, z):
+        preds, cond_probs = [], []
+        
+        # Initial cell states
+        h_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
+        c_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
+        
+        h_last_layer, (h_t, c_t) = self.lstm(z, (h_t, c_t))
+        y = self.fc(h_last_layer) if self.Dense else h_last_layer
+        gammas, mus, sigmas = self.GMM(y.squeeze(1))
+        x_preds, x_cond_prosb = self.GMM_sampler(gammas, mus, sigmas)
+        
+        paths = torch.stack(preds).squeeze().transpose(0,1)
+        paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0,1)
+
+        return paths, paths_cond_probs
+    
 ####################### TESTS #######################
 if __name__ == '__main__':    
     print('Helloooo')
