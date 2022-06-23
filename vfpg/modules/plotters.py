@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import integrate
 
-def loss_paths_plot(bound, time_grid, path_manifold, current_epoch, loss_list,
-                    delta_L):
+def loss_paths_plot(bound, time_grid, path_manifold, wf, current_epoch, 
+                    loss_list, delta_L):
 
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(14, 6))
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
     
     # Loss
-    ax0 = ax[0]
+    ax0 = ax[0][0]
     ax0.set_title('Loss', fontsize=17)
     ax0.set_xlabel('Epoch', fontsize=17)
     ax0.tick_params(axis='both', labelsize=15)
@@ -18,16 +18,31 @@ def loss_paths_plot(bound, time_grid, path_manifold, current_epoch, loss_list,
              +f'{round(delta_L.item(), 2)}')
     ax0.legend(fontsize=16)
     
-    # Paths
-    ax1 = ax[1]
-    ax1.set_title(r'Path $x(\tau)$', fontsize=17)
-    ax1.set_xlabel(r'$\tau$', fontsize=17)
-    ax1.set_ylabel('$x$', rotation=180, labelpad=10, fontsize=17)
+    # Wave functions
+    ax1 = ax[0][1]
+    x_axis_hist = np.linspace(-4.95, 4.95, 100)
+    sigma = np.sqrt(1.)
+    x_target = np.linspace(-3, 3, 200)
+    y_target = (((1/(np.pi*sigma**2))**(1/4))*np.exp(-x_target**2/(2*sigma**2)))**2
+    ax1.hist(x_axis_hist, weights=wf, bins=int(len(x_axis_hist)))
+    #ax.plot(x_axis,y_axis,linestyle='none',marker='o')
+    ax1.plot(x_target,y_target,label='$|\Psi_0(x)|^2,\quad\sigma=1$')
+    ax1.set_xlim(-3, 3)
+    ax1.set_ylabel('$|\Psi(x)|^2$', fontsize=17)
     ax1.tick_params(axis='both', labelsize=15)
+    ax1.legend(fontsize=16)
+    
+    # Paths
+    ax3 = ax[1][1]
+    ax3.set_title(r'Path $x(\tau)$', fontsize=17)
+    ax3.set_xlabel('$x$', fontsize=17)
+    ax3.set_ylabel(r'$\tau$', fontsize=17)
+    ax3.set_xlim(-4, 4)
+    ax3.tick_params(axis='both', labelsize=15)
     #print(path_manifold)
     for path in path_manifold[:bound]:
         #print(f'\nTime grid: {time_grid}')
         #print(f'Single path: {path.detach()}')
-        ax1.plot(time_grid, path.detach())
+        ax3.plot(path.detach(), time_grid)
         
     plt.show()

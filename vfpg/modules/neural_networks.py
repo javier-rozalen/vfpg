@@ -5,16 +5,6 @@ from torch import nn
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 import numpy as np
-from torch.autograd import Variable
-
-############################ AUXILIARY FUNCTIONS ##############################
-def show_layers(model):
-    print("\nLayers and parameters:\n")
-    for name, param in model.named_parameters():
-        print(f"Layer: {name} | Size: {param.size()} | Values : {param[:100]} \n")
-        
-def count_params(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 class VFPG_old(nn.Module):
     """
@@ -121,13 +111,13 @@ class VFPG(nn.Module):
     def GMM(self, params):    
         # params.shape = [M,(N+2)*Nc]
         N = self.input_size
+        
         gammas, mus, sigmas = [], [], []
         for i in range(self.Nc):
             gc = params[:, i*(N+2):(i+1)*(N+2)]
             params_mu = gc[:, :N] # [M,Nc]
             params_gamma = gc[:, N:N+1] # [M,Nc*N]
             params_sigma = gc[:, N+1:N+2] # [M,Nc]
-            
             gammas.append(params_gamma)
             mus.append(params_mu)
             sigmas.append(params_sigma)
@@ -144,7 +134,7 @@ class VFPG(nn.Module):
         
         # Sampling from the mixture density
         _gammas = gammas.squeeze(2).transpose(0, 1)
-        print(_gammas)
+        #print(f'_gammas: {_gammas}')
         _mus = mus.squeeze(2).transpose(0, 1)
         _sigmas = sigmas.squeeze(2).transpose(0, 1)
         gamma_cat_dist = Categorical(_gammas)
@@ -156,7 +146,7 @@ class VFPG(nn.Module):
             _chosen_sigmas.append(_sigmas[i][idx].unsqueeze(0))
         _chosen_mus = torch.stack(_chosen_mus)
         _chosen_sigmas = torch.stack(_chosen_sigmas)
-        print(f'_chosen_mus: {_chosen_mus}')
+        #print(f'_chosen_mus: {_chosen_mus}')
         gmm_dist = Normal(loc=_chosen_mus, scale=_chosen_sigmas)
         x_pred = gmm_dist.sample()
     
@@ -193,7 +183,7 @@ class VFPG(nn.Module):
         c_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
         
         # Recurrence loop
-        for i in range(self.N - 1):
+        for i in range(self.N - 2):
             """
             print(f'\nIteration {i+1}/{self.N}\n-------------------')
             print(f'x_prev: {x_prev}', x_prev.size())
@@ -208,6 +198,9 @@ class VFPG(nn.Module):
             cond_probs.append(x_cond_prob)
             x_prev = x_pred 
         
+        # We close the paths
+        preds.append(preds[0])
+        cond_probs.append(torch.ones(self.M, 1))
         paths = torch.stack(preds).squeeze().transpose(0,1)
         paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0,1)
         """
@@ -216,6 +209,90 @@ class VFPG(nn.Module):
         """
         return paths, paths_cond_probs
 
+class VFPG_optimized(nn.Module):
+
+    def __init__(self, M, N, input_size, nhid, hidden_size, out_size, 
+                 num_layers, Dense=True):
+        super(VFPG_optimized, self).__init__()
+        
+        # Auxiliary stuff
+        self.M = M
+        self.N = N # length of each path
+        self.input_size = input_size
+        self.nhid = nhid # number of hidden neurons 
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.Nc = int(out_size / (input_size + 2))
+        self.Dense = Dense
+        self.pi = torch.tensor(np.pi)
+        self.softmax = nn.Softmax(dim=1)
+        
+        # Neural Network
+        self.lstm = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
+        self.fc = nn.Linear(in_features=hidden_size, 
+                            out_features=out_size,                                                   
+                            bias=True)
+
+    def GMM(self, params):    
+        # params size = [M, (N+2)*Nc]
+        
+        gammas = self.softmax(params[:, :self.Nc]) # size [M, Nc]
+        sigmas = torch.exp(params[:, self.Nc:2*self.Nc]) # size [M, Nc]
+        mus = params[:, 2*self.Nc:] # size [M, N*Nc]
+
+        return gammas, mus, sigmas 
+    
+    def GMM_sampler(self, gammas, mus, sigmas):
+        
+        # Sampling from the mixture density
+        g_sampled_idcs = Categorical(gammas).sample().unsqueeze(1)
+        chosen_mus = mus.gather(1, g_sampled_idcs)
+        chosen_sigmas = sigmas.gather(1, g_sampled_idcs)
+        gmm_dist = Normal(loc=chosen_mus, scale=chosen_sigmas)
+        x_pred = gmm_dist.sample()
+    
+        # Computing the probability of the sample
+        x_pred_rep = x_pred.repeat(1, self.Nc)
+        kernels_exponent = (x_pred_rep - mus)**2
+        kernels = torch.exp(-0.5*kernels_exponent) / (sigmas**2)
+        kernels /= ((2*self.pi)**(self.N/2))*(sigmas**self.N)
+        
+        gammas = gammas.view(self.M, 1, self.Nc)
+        kernels = kernels.view(self.M, self.Nc, 1)
+        x_cond_prob = torch.bmm(gammas, kernels).squeeze(2)
+
+        return x_pred.unsqueeze(2), x_cond_prob 
+        
+    def forward(self, x_prev):
+        preds, cond_probs = [x_prev], [torch.ones(self.M, 1)]
+        
+        # Initial cell states
+        h_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
+        c_t = torch.zeros(self.num_layers, self.M, self.hidden_size)
+        
+        # Recurrence loop
+        for i in range(self.N - 2):
+            h_last_layer, (h_t, c_t) = self.lstm(x_prev, (h_t, c_t))
+            y = self.fc(h_last_layer) if self.Dense else h_last_layer
+            gammas, mus, sigmas = self.GMM(y.squeeze(1))
+            x_pred, x_cond_prob = self.GMM_sampler(gammas, mus, sigmas)
+            preds.append(x_pred)
+            cond_probs.append(x_cond_prob)
+            x_prev = x_pred 
+        
+        # We close the paths
+        preds.append(preds[0])
+        cond_probs.append(torch.ones(self.M, 1))
+        paths = torch.stack(preds).squeeze().transpose(0,1)
+        paths_cond_probs = torch.stack(cond_probs).squeeze().transpose(0,1)
+        """
+        print(f'Paths: {paths}')
+        print(f'Paths_cond_probs: {paths_cond_probs}')
+        """
+        return paths, paths_cond_probs
 ####################### TESTS #######################
 if __name__ == '__main__':    
     print('Helloooo')

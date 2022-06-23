@@ -14,27 +14,25 @@ from tqdm import tqdm
 from torch.autograd import grad
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
+from scipy import integrate
 
 # My modules
 #from modules.physical_constants import *
-from modules.neural_networks import VFPG, show_layers, count_params
-from modules.loss_functions import loss_DKL
-from modules.aux_functions import train_loop
-from modules.lagrangians import L_HO
+from modules.neural_networks import *
+from modules.loss_functions import loss_DKL, loss_MSE
+from modules.aux_functions import *
 from modules.plotters import loss_paths_plot
 
 ############################# GENERAL PARAMETERS #############################
 # General parameters
-M = 5 # number of paths (for Monte Carlo estimates)
-N = 4 # length of the path
+M = 1000 # number of paths (for Monte Carlo estimates)
+N = 32 # length of the path
 Nc = 3 # number of gaussian components
 
-x_i = 0.
-x_f = 0.
 t_0 = 0.
 t_f = 100.
 t = [torch.tensor(e) for e in np.linspace(t_0, t_f, N)]
-h = t[1]-t[0]
+h = t[1] - t[0]
 
 # Neural network parameters
 input_size = 1 # dimension of the input 
@@ -48,28 +46,30 @@ z = 6.*torch.rand(M, 1, input_size)-torch.tensor(3.).repeat(M, 1, input_size)
 #z = torch.zeros(M, 1, input_size)
 
 # Hyperparameters
-learning_rate = 1e-3
+learning_rate = 1e-4
 epsilon = 1e-8
 smoothing_constant = 0.9
 
 # Training parameters
-n_epochs = 5000
+n_epochs = 1000
 mini_batching = False
 
 # Plotting parameters
-n_plots = 50
+n_plots = 5
 leap = n_epochs/n_plots
 bound = 10
 show_periodic_plots = True
+dx = 0.1
 
 # Saves
 save_model = False
 
-torch.manual_seed(1)
+#torch.manual_seed(1)
+dx_list = [dx for e in range(M)]
 
 ############################# NEURAL NETWORK #############################
 hidden_size = hidden_size if Dense else out_size
-vfpg = VFPG(M=M,
+vfpg = VFPG_optimized(M=M,
             N=N, 
             input_size=input_size, 
             nhid=nhid,
@@ -86,11 +86,12 @@ loss_fn = loss_DKL
 
 ############################# EPOCH LOOP #############################
 loss_KL_list = [] 
+print(f'Training a model with {count_params(vfpg)} parameters.\n')
 
 for j in tqdm(range(n_epochs)):
-    #print('\n')
     # Train loop
-    #Lprint(f'\nInput to LSTM at epoch {j}: {z}', z.size())
+    #print('\n')
+    #print(f'\nInput to LSTM at epoch {j}: {z}', z.size())
     L, delta_L, paths = train_loop(model=vfpg, 
                                    loss_fn=loss_fn, 
                                    optimizer=optimizer, 
@@ -101,10 +102,19 @@ for j in tqdm(range(n_epochs)):
     loss_KL_list.append(L.item())
     
     # Periodic plots
-    if (j+1)%leap == 0 and show_periodic_plots:
+    if (j+1) % leap == 0 and show_periodic_plots:
+
+        # We compute the wave function from the paths sampled by the LSTM
+        counts = list(map(histogram, paths.detach().numpy(), dx_list))
+        wf = np.sum(counts, axis=0)
+        wf_norm = integrate.simpson(y=wf, x=np.linspace(-4.95, 4.95, 100))
+        wf /= wf_norm
+                                                  
+        # Plotting
         loss_paths_plot(bound=bound,
                         time_grid=t, 
                         path_manifold=paths, 
+                        wf=wf,
                         current_epoch=j, 
                         loss_list=loss_KL_list,
                         delta_L = delta_L)
