@@ -315,7 +315,7 @@ class VFPG_theirs(nn.Module):
         self.Nc = int(out_size / (1 + 2))
         self.Dense = Dense
         self.pi = torch.tensor(np.pi)
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=2)
         
         # Neural Network
         self.lstm = nn.LSTM(input_size=input_size,
