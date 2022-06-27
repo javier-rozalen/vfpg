@@ -245,7 +245,11 @@ class VFPG_ours(nn.Module):
         gammas = self.softmax(params[:, :self.Nc]) # size [M, Nc]
         sigmas = torch.exp(params[:, self.Nc:2*self.Nc]) # size [M, Nc]
         mus = params[:, 2*self.Nc:] # size [M, N*Nc]
-
+        """
+        print(f'gammas: {gammas}', gammas.shape)
+        print(f'sigmas: {sigmas}', sigmas.shape)
+        print(f'mus: {mus}', mus.shape)
+        """
         return gammas, mus, sigmas 
     
     def GMM_sampler(self, gammas, mus, sigmas):

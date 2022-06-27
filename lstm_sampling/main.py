@@ -14,26 +14,17 @@ from scipy import integrate
 # My modules
 from modules.neural_networks import VFPG_ours, VFPG_theirs
 from modules.loss_functions import loss_DKL, loss_MSE
-from modules.aux_functions import count_params, show_layers, train_loop, histogram
+from modules.aux_functions import count_params, show_layers, train_loop
 from modules.plotters import loss_paths_plot
-from modules.lagrangians import L_HO, L_double_well
 
 ############################# GENERAL PARAMETERS #############################
 # General parameters
 dev = 'cuda' if torch.cuda.is_available() else 'cpu'
 which_net = 'theirs'
-M = 2048 # number of paths (for Monte Carlo estimates)
-N = 32 # length of the path
-batch_size = 128
-Nc = batch_size # number of gaussian components
-
-t_0 = 0.
-t_f = 0.5
-x_i = torch.tensor(0.).to(dev)
-x_f = torch.tensor(1.).to(dev)
-t = [torch.tensor(e) for e in np.linspace(t_0, t_f, N)]
-h = t[1] - t[0]
-potential = L_HO
+M = 1 # number of paths (for Monte Carlo estimates)
+N = 5 # length of the path
+Nc = 5 # number of gaussian components
+mus, sigmas = torch.zeros(N), torch.ones(N)
 
 # Neural network parameters
 input_size = 2 if which_net == 'theirs' else 1 # dimension of the input 
@@ -44,40 +35,37 @@ num_layers = 1 # number of stacked LSTM layers
 Dense = True # controls wether there is a Linear layer after the LSTM or not
 if which_net == 'ours':
     # Input to LSTM: M sequences, each of length 1, elements of dim input_size
-    z = 3 * (2*torch.rand(M, 1, 1)-torch.ones(M, 1, 1)).to(dev)
+    z = 5 * (2*torch.rand(M, 1, 1)-torch.ones(M, 1, 1)).to(dev)
 elif which_net == 'theirs':
     # Input to LSTM: M sequences, each of length N, elements of dim input_size
     # z = torch.randn(M, N, input_size).to(dev) # everything is different
-    z = [torch.randn(input_size).repeat(N, 1) for _ in range(M)]
+    z = [5*torch.randn(input_size).repeat(N, 1) for _ in range(M)]
     z = torch.stack(z).to(dev) # same 2D for all steps, different 2D for different paths
     
 # Hyperparameters
-learning_rate = 1e-4
+learning_rate = 1e-5
 epsilon = 1e-8
 smoothing_constant = 0.9
 
 # Training parameters
 n_epochs = 10000
-mini_batching = True
 
 # Plotting parameters
-n_plots = 1000 
+n_plots = 5
 leap = n_epochs/n_plots
 bound = 10
 show_periodic_plots = True
-dx = 0.1
 
 # Saves
 save_model = False
 
 torch.manual_seed(1)
-dx_list = [dx for e in range(M)]
 
 ############################# NEURAL NETWORK #############################
 hidden_size = hidden_size if Dense else out_size
 if which_net == 'ours':
     vfpg = VFPG_ours(dev=dev,
-                     M=batch_size,
+                     M=M,
                      N=N, 
                      input_size=input_size, 
                      nhid=nhid,
@@ -87,7 +75,7 @@ if which_net == 'ours':
                      Dense=Dense).to(dev)
 elif which_net == 'theirs':
     vfpg = VFPG_theirs(dev=dev,
-                       M=batch_size,
+                       M=M,
                        N=N, 
                        input_size=input_size, 
                        nhid=nhid,
@@ -106,37 +94,27 @@ loss_KL_list = []
 print(f'Training a model with {count_params(vfpg)} parameters on {dev}.\n')
 
 for j in tqdm(range(n_epochs)):
-    for b in range(M // batch_size):
-        z_b = z[b*batch_size:(b+1)*batch_size, :, :]
-        L, delta_L, paths = train_loop(model=vfpg, 
-                                       loss_fn=loss_fn, 
-                                       optimizer=optimizer, 
-                                       train_set=z_b, 
-                                       h=h,
-                                       x_i=x_i,
-                                       x_f=x_f)
-        
+    # Train loop
+    #print('\n')
+    #print(f'\nInput to LSTM at epoch {j}: {z}', z.size())
+    L, delta_L, paths = train_loop(model=vfpg, 
+                                   train_set=z,
+                                   loss_fn=loss_fn, 
+                                   optimizer=optimizer, 
+                                   mus=mus,
+                                   sigmas=sigmas)
+    
     # Loss tracking
     loss_KL_list.append(L.item())
     
     # Periodic plots
-    if (j+1) % leap == 0 and show_periodic_plots:
-
-        # We compute the wave function from the paths sampled by the LSTM
-        counts = list(map(histogram, paths.cpu().detach().numpy(), dx_list))
-        wf = np.sum(counts, axis=0)
-        wf_norm = integrate.simpson(y=wf, x=np.linspace(-4.95, 4.95, 100))
-        wf /= wf_norm
-                                                  
-        # Plotting
+    if (j+1) % leap == 0 and show_periodic_plots:                                                  
         loss_paths_plot(bound=bound,
-                        time_grid=t, 
                         path_manifold=paths.cpu(), 
-                        wf=wf,
                         current_epoch=j, 
                         loss_list=loss_KL_list,
                         delta_L=delta_L)
-
+        
 print('\nDone! :)')
 
 # Save the model
@@ -146,7 +124,7 @@ if save_model:
         'state_dict': vfpg.state_dict(),
         'optimizer': optimizer.state_dict()
         }
-    model_name = 'first_models.pt'
+    model_name = 'saved_models/model.pt'
     torch.save(state, model_name)
     print(f'Model correctly saved at: {model_name}')
     

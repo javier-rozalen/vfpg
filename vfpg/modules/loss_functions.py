@@ -43,7 +43,7 @@ def loss_DKL(model, train_set=[], target_set=[], potential=L_HO, h=1, x_i=0.,
     # We compute the actions of all the paths
     L_paths = L_HO(paths, h, m, w) # lagrangiangs of all paths, size [M, N]
     S_paths = h * torch.sum(L_paths, dim=1) # actions of all paths, size [M, N]
-    S_paths = S_paths.squeeze(1)
+    S_paths = S_paths.squeeze()
     """
     print(f'L_paths: {L_paths}', L_paths.shape)
     print(f'S_paths: {S_paths}', S_paths.shape)
@@ -60,6 +60,7 @@ def loss_DKL(model, train_set=[], target_set=[], potential=L_HO, h=1, x_i=0.,
     print(f'f: {f}', f.shape)
     print(f'loss_KL: {loss_KL}', loss_KL.shape)
     """
+    
     # Loss_initial
     N = paths.size(1)
     mus_i = mus[:, 0, :]
@@ -72,6 +73,7 @@ def loss_DKL(model, train_set=[], target_set=[], potential=L_HO, h=1, x_i=0.,
     sigmas_f = sigmas[:, -1, :]
     fss = N*torch.sum((mus_f-x_f.expand(mus_f.shape))**2 + sigmas_f**2, dim=1)
     loss_f = torch.sum(fss) 
+    
     """
     print(f'loss_KL: {loss_KL}')
     print(f'loss_i: {loss_i}')
@@ -85,7 +87,7 @@ def loss_DKL(model, train_set=[], target_set=[], potential=L_HO, h=1, x_i=0.,
     print(f'S_paths: {S_paths}', S_paths.shape)
     print(f'f: {f}', f.shape)
     """
-    return loss_KL, MC_err, paths
+    return loss, MC_err, paths
 
 def loss_MSE(model, train_set=[], target_set=[], h=1):
     """
