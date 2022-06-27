@@ -22,24 +22,24 @@ from modules.lagrangians import L_HO, L_double_well
 # General parameters
 dev = 'cuda'
 which_net = 'theirs'
-M = 1000 # number of paths (for Monte Carlo estimates)
-N = 32 # length of the path
+M = 5 # number of paths (for Monte Carlo estimates)
+N = 4 # length of the path
 Nc = 3 # number of gaussian components
 
 t_0 = 0.
-t_f = 1.
+t_f = 100.
 x_i = torch.tensor(0.).to(dev)
 x_f = torch.tensor(0.).to(dev)
 t = [torch.tensor(e) for e in np.linspace(t_0, t_f, N)]
 h = t[1] - t[0]
-potential = L_double_well
+potential = L_HO
 
 # Neural network parameters
 input_size = 2 # dimension of the input 
-nhid = 20 # number of hidden neurons
-hidden_size = 20 # dimension of the LSTM hidden state vector
+nhid = 6 # number of hidden neurons
+hidden_size = 7 # dimension of the LSTM hidden state vector
 out_size = (1 + 2)*Nc # size of the LSTM output, y
-num_layers = 2 # number of stacked LSTM layers
+num_layers = 1 # number of stacked LSTM layers
 Dense = True # controls wether there is a Linear layer after the LSTM or not
 if which_net == 'ours':
     # Input to LSTM: M sequences, each of length 1, elements of dim input_size
@@ -56,12 +56,12 @@ epsilon = 1e-8
 smoothing_constant = 0.9
 
 # Training parameters
-n_epochs = 20000
+n_epochs = 1
 mini_batching = False
 batch_size = 128
 
 # Plotting parameters
-n_plots = 10 
+n_plots = 20 
 leap = n_epochs/n_plots
 bound = 10
 show_periodic_plots = True
@@ -70,7 +70,7 @@ dx = 0.1
 # Saves
 save_model = False
 
-#torch.manual_seed(1)
+torch.manual_seed(1)
 dx_list = [dx for e in range(M)]
 
 ############################# NEURAL NETWORK #############################
@@ -102,7 +102,7 @@ optimizer = torch.optim.Adam(params=vfpg.parameters(),
 loss_fn = loss_DKL
 
 ############################# EPOCH LOOP #############################
-loss_KL_list = [] 
+loss_KL_list = []  
 print(f'Training a model with {count_params(vfpg)} parameters.\n')
 
 for j in tqdm(range(n_epochs)):

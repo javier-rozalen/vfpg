@@ -26,12 +26,18 @@ def L_HO(paths, h, m, w):
         tensor with the lagrangian at each path position.
 
     """
+
     x_i = paths[:,1:]
     x_i1 = paths[:,:-1]
     K = ((x_i - x_i1) / h)**2
     V = (w*(x_i + x_i1) / 2)**2
     L = 0.5 * m * (K + V)
-    
+    """
+    print(f'paths: {paths}', paths.shape)
+    print(f'x_i : {x_i}', x_i.shape)
+    print(f'x_i1: {x_i1}', x_i1.shape)
+    print(f'x_i-x_i1: {x_i-x_i1}', (x_i-x_i1).shape)
+    """ 
     return L
 
 def L_double_well(paths, h, m, w):

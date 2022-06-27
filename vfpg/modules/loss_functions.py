@@ -44,14 +44,22 @@ def loss_DKL(model, train_set=[], target_set=[], potential=L_HO, h=1, x_i=0.,
     L_paths = L_HO(paths, h, m, w) # lagrangiangs of all paths, size [M, N]
     S_paths = h * torch.sum(L_paths, dim=1) # actions of all paths, size [M, N]
     S_paths = S_paths.squeeze(1)
-    
+    """
+    print(f'L_paths: {L_paths}', L_paths.shape)
+    print(f'S_paths: {S_paths}', S_paths.shape)
+    """
     # Loss_KL
     M = torch.tensor(paths.size(0))
     log_q_phi = torch.sum(torch.log(paths_cond_probs), dim=1)
     f = (1/hbar)*S_paths + log_q_phi
     loss_KL = (1/M)*torch.sum(f)
     MC_err = torch.sqrt((1/M)*torch.sum(f**2)-loss_KL**2) / torch.sqrt(M)
-    
+    """
+    print(f'paths_cond_probs: {paths_cond_probs}', paths_cond_probs.shape)
+    print(f'log_q_phi: {log_q_phi}', log_q_phi.shape)
+    print(f'f: {f}', f.shape)
+    print(f'loss_KL: {loss_KL}', loss_KL.shape)
+    """
     # Loss_initial
     N = paths.size(1)
     mus_i = mus[:, 0, :]

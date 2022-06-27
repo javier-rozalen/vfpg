@@ -351,15 +351,15 @@ class VFPG_theirs(nn.Module):
         #print(f'x_pred: {x_pred}', x_pred.shape)
     
         # Computing the probability of the sample
-        #print(f'x_pred_rep: {x_pred_rep}', x_pred_rep.shape)
+        #print(f'x_pred_rep: {x_pred.repeat(1, 1, self.Nc)}', x_pred.repeat(1, 1, self.Nc).shape)
         kernels_exponent = (x_pred.repeat(1, 1, self.Nc) - mus)**2
         kernels = torch.exp(-0.5*kernels_exponent) / (sigmas**2)
         kernels /= ((2*self.pi)**(self.N/2))*(sigmas**self.N)
         
         _gammas = gammas.view(self.M, self.N, 1, self.Nc)
         _kernels = kernels.view(self.M, self.N, self.Nc, 1)
-        #print(f'gammas: {gammas}', gammas.shape)
-        #print(f'kernels: {kernels}', kernels.shape)
+        #print(f'_gammas: {_gammas}', _gammas.shape)
+        #print(f'_kernels: {_kernels}', _kernels.shape)
         x_cond_prob = (_gammas @ _kernels).squeeze(3).squeeze(2)
         #print(f'x_cond_prob: {x_cond_prob}', x_cond_prob.shape)
 
@@ -376,7 +376,7 @@ class VFPG_theirs(nn.Module):
         print(f'h_last_layer: {h_last_layer}', h_last_layer.shape)
         print(f'h_t: {h_t}', h_t.shape)
         print(f'c_t: {c_t}', c_t.shape)
-    """
+        """
         y = self.fc(h_last_layer) if self.Dense else h_last_layer # Linear
         #print(f'y: {y}', y.shape)
         gammas, mus, sigmas = self.GMM(y) # mixture params computation
