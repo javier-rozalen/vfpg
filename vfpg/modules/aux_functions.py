@@ -3,7 +3,7 @@ import numpy as np
 from modules.lagrangians import L_HO, L_double_well
 
 def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0, 
-               potential=L_HO, h=0, x_i=0, x_f=1):
+               potential=L_HO, M_MC=100, h=0, x_i=0, x_f=1):
     """
     Training loop.
 
@@ -20,16 +20,17 @@ def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0,
 
     """  
     optimizer.zero_grad()
-    loss_output, MC_error, paths = loss_fn(model=model, 
-                                           train_set=train_set, 
-                                           target_set=target_data, 
-                                           potential=potential,
-                                           h=h, 
-                                           x_i=x_i,
-                                           x_f=x_f)
-    loss_output.backward()
+    loss, loss_KL, loss_i, loss_f, MC_error, paths = loss_fn(model=model, 
+                                                           train_set=train_set, 
+                                                           target_set=target_data, 
+                                                           potential=potential,
+                                                           M_MC = M_MC,
+                                                           h=h, 
+                                                           x_i=x_i,
+                                                           x_f=x_f)
+    loss.backward()
     optimizer.step()
-    return loss_output, MC_error, paths
+    return loss, loss_KL, loss_i, loss_f, MC_error, paths
 
 def show_layers(model):
     print("\nLayers and parameters:\n")

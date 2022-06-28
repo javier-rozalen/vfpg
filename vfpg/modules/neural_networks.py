@@ -1,11 +1,17 @@
 
 # -*- coding: utf-8 -*-
 
-import torch
+import torch, logging
 from torch import nn
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 import numpy as np
+
+toggle_prints = False
+
+def print_(*message):
+    if toggle_prints:
+        print(*message)
 
 class VFPG_old(nn.Module):
     """
@@ -310,7 +316,7 @@ class VFPG_theirs(nn.Module):
         
         # Auxiliary stuff
         self.dev = dev
-        self.M = M
+        self.M = M # batch size
         self.N = N # length of each path
         self.input_size = input_size
         self.nhid = nhid # number of hidden neurons 
@@ -350,8 +356,12 @@ class VFPG_theirs(nn.Module):
         chosen_mus = mus.gather(2, g_sampled_idcs)
         chosen_sigmas = sigmas.gather(2, g_sampled_idcs)
         #print(f'chosen_mus: {chosen_mus}', chosen_mus.shape)
+        """
         gmm_dist = Normal(loc=chosen_mus, scale=chosen_sigmas)
         x_pred = gmm_dist.sample()
+        """
+        g = torch.randn(1).to(self.dev)
+        x_pred = chosen_mus + g*chosen_sigmas
         #print(f'x_pred: {x_pred}', x_pred.shape)
     
         # Computing the probability of the sample
@@ -391,6 +401,145 @@ class VFPG_theirs(nn.Module):
         """
         return paths, paths_cond_probs, mus, sigmas
     
+class VFPG_theirs_v2(nn.Module):
+
+    def __init__(self, dev, batch_size, N, input_size, nhid, hidden_size, out_size, 
+                 num_layers, Dense=True):
+        super(VFPG_theirs_v2, self).__init__()
+        
+        # Auxiliary stuff
+        self.dev = dev
+        self.batch_size = batch_size # batch size
+        self.Nc = self.batch_size # number of gaussian components
+        self.N = N # length of each path
+        self.input_size = input_size
+        self.nhid = nhid # number of hidden neurons 
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.Dense = Dense
+        self.pi = torch.tensor(np.pi)
+        self.softmax = nn.Softmax(dim=0)
+        
+        # Neural Network
+        self.lstm = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True)
+        self.fc = nn.Linear(in_features=hidden_size, 
+                            out_features=out_size,                                                   
+                            bias=True)
+
+    def GMM(self, params):    
+        # params.shape = [batch_size, N, 3]
+        gammas = self.softmax(params[:, :, 0]) # size [batch_size, N]
+        mus = params[:, :, 1] # size [batch_size, N]
+        sigmas = torch.exp(params[:, :, 2]) # size [batch_size, N]
+        
+        print_(f'gammas: {gammas}', gammas.shape)
+        print_(f'mus: {mus}', mus.shape)
+        print_(f'sigmas: {sigmas}', sigmas.shape)
+        
+        return gammas, mus, sigmas 
+    
+    def sample(self, gammas, mus, sigmas):
+        # Sampling from the mixture density
+        _gammas_categ = gammas.transpose(0,1) # size [N, batch_size]
+        _mus_categ = mus.transpose(0,1) # size [N, batch_size]
+        _sigmas_categ = sigmas.transpose(0,1) # size [N, batch_size]
+        print_(f'_gammas_categ: {_gammas_categ}', _gammas_categ.shape)
+        print_(f'_mus_categ: {_mus_categ}', _mus_categ.shape)
+        print_(f'_sigmas_categ: {_sigmas_categ}', _sigmas_categ.shape)
+        g_sampled_idcs = Categorical(_gammas_categ).sample().unsqueeze(1)
+        print_(f'g_sampled_idcs: {g_sampled_idcs}', g_sampled_idcs.shape)
+        chosen_gammas = _gammas_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        chosen_mus = _mus_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        chosen_sigmas = _sigmas_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        print_(f'chosen _gammas_categ: {chosen_gammas}', chosen_gammas.shape)
+        print_(f'chosen _mus_categ: {chosen_mus}', chosen_mus.shape)
+        print_(f'chosen _sigmas_categ: {chosen_sigmas}', chosen_sigmas.shape)
+        g = torch.randn(1).to(self.dev) 
+        x_pred = chosen_mus + g*chosen_sigmas # size [N, 1]
+        print_(f'x_pred: {x_pred}', x_pred.shape)
+    
+        # Computing the probability of the sample
+        print_(f'x_pred_rep: {x_pred.repeat(1, self.batch_size)}', 
+              x_pred.repeat(1, self.batch_size).shape)
+        x_pred_rep = x_pred.repeat(1, self.batch_size) # size [N, batch_size]
+        kernels_exponent = (x_pred_rep - _mus_categ)**2
+        kernels = torch.exp(-0.5*kernels_exponent) / (_sigmas_categ**2)
+        kernels /= ((2*self.pi)**(self.N/2))*(_sigmas_categ**self.N) # size [N, batch_size]
+        print_(f'kernels: {kernels}', kernels.shape)
+        
+        _gammas = gammas.view(self.N, 1, self.batch_size)
+        _kernels = kernels.view(self.N, self.batch_size, 1)
+        print_(f'_gammas: {_gammas}', _gammas.shape)
+        print_(f'_kernels: {_kernels}', _kernels.shape)
+        
+        x_cond_prob = (_gammas @ _kernels).squeeze(2).squeeze(1)
+        print_(f'x_pred final: {x_pred.squeeze()}', x_pred.squeeze().shape)
+        print_(f'x_cond_prob final: {x_cond_prob}', x_cond_prob.shape)
+        
+        return x_pred.squeeze(), x_cond_prob
+    
+    def sample_tocho(self, M_MC, gammas, mus, sigmas):
+        # Sampling from the mixture density
+        _gammas_categ = gammas.transpose(0,1) # size [N, batch_size]
+        _mus_categ = mus.transpose(0,1) # size [N, batch_size]
+        _sigmas_categ = sigmas.transpose(0,1) # size [N, batch_size]
+        print_(f'_gammas_categ: {_gammas_categ}', _gammas_categ.shape)
+        print_(f'_mus_categ: {_mus_categ}', _mus_categ.shape)
+        print_(f'_sigmas_categ: {_sigmas_categ}', _sigmas_categ.shape)
+        g_sampled_idcs = Categorical(_gammas_categ).sample().unsqueeze(1)
+        print_(f'g_sampled_idcs: {g_sampled_idcs}', g_sampled_idcs.shape)
+        chosen_gammas = _gammas_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        chosen_mus = _mus_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        chosen_sigmas = _sigmas_categ.gather(1, g_sampled_idcs) # size [N, 1]
+        print_(f'chosen _gammas_categ: {chosen_gammas}', chosen_gammas.shape)
+        print_(f'chosen _mus_categ: {chosen_mus}', chosen_mus.shape)
+        print_(f'chosen _sigmas_categ: {chosen_sigmas}', chosen_sigmas.shape)
+        g = torch.randn(1).to(self.dev) 
+        x_pred = chosen_mus + g*chosen_sigmas # size [N, 1]
+        print_(f'x_pred: {x_pred}', x_pred.shape)
+    
+        # Computing the probability of the sample
+        print_(f'x_pred_rep: {x_pred.repeat(1, self.batch_size)}', 
+              x_pred.repeat(1, self.batch_size).shape)
+        x_pred_rep = x_pred.repeat(1, self.batch_size) # size [N, batch_size]
+        kernels_exponent = (x_pred_rep - _mus_categ)**2
+        kernels = torch.exp(-0.5*kernels_exponent) / (_sigmas_categ**2)
+        kernels /= ((2*self.pi)**(self.N/2))*(_sigmas_categ**self.N) # size [N, batch_size]
+        print_(f'kernels: {kernels}', kernels.shape)
+        
+        _gammas = gammas.view(self.N, 1, self.batch_size)
+        _kernels = kernels.view(self.N, self.batch_size, 1)
+        print_(f'_gammas: {_gammas}', _gammas.shape)
+        print_(f'_kernels: {_kernels}', _kernels.shape)
+        
+        x_cond_prob = (_gammas @ _kernels).squeeze(2).squeeze(1)
+        print_(f'x_pred final: {x_pred.squeeze()}', x_pred.squeeze().shape)
+        print_(f'x_cond_prob final: {x_cond_prob}', x_cond_prob.shape)
+        
+        return x_pred.squeeze(), x_cond_prob
+        
+    def forward(self, z):
+        
+        # Initial cell states
+        h_t = torch.zeros(self.num_layers, self.batch_size, self.hidden_size).to(self.dev)
+        c_t = torch.zeros(self.num_layers, self.batch_size, self.hidden_size).to(self.dev)
+        
+        h_last_layer, (h_t, c_t) = self.lstm(z, (h_t, c_t)) # LSTM
+        
+        print_(f'h_last_layer: {h_last_layer}', h_last_layer.shape)
+        print_(f'h_t: {h_t}', h_t.shape)
+        print_(f'c_t: {c_t}', c_t.shape)
+        
+        y = self.fc(h_last_layer) if self.Dense else h_last_layer # Linear
+        # y.shape = [batch_size, N, 3]
+        print_(f'y: {y}', y.shape)
+        gammas, mus, sigmas = self.GMM(y) # mixture params computation
+
+        return gammas, mus, sigmas
+
 ####################### TESTS #######################
 if __name__ == '__main__':    
     print('Helloooo')
