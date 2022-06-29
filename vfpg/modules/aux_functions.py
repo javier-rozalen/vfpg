@@ -20,7 +20,7 @@ def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0,
 
     """  
     optimizer.zero_grad()
-    loss, loss_KL, loss_i, loss_f, MC_error, paths = loss_fn(model=model, 
+    loss, loss_KL, loss_i, loss_f, MC_error, paths, log_q_phi, S_paths = loss_fn(model=model, 
                                                            train_set=train_set, 
                                                            target_set=target_data, 
                                                            potential=potential,
@@ -30,7 +30,7 @@ def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0,
                                                            x_f=x_f)
     loss.backward()
     optimizer.step()
-    return loss, loss_KL, loss_i, loss_f, MC_error, paths
+    return loss, loss_KL, loss_i, loss_f, MC_error, paths, log_q_phi, S_paths
 
 def show_layers(model):
     print("\nLayers and parameters:\n")

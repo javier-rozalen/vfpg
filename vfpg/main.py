@@ -15,35 +15,35 @@ from scipy import integrate
 from modules.neural_networks import VFPG_ours, VFPG_theirs, VFPG_theirs_v2
 from modules.loss_functions import loss_DKL, loss_MSE, loss_DKL_v2
 from modules.aux_functions import count_params, show_layers, train_loop, histogram
-from modules.plotters import loss_paths_plot_theirs
+from modules.plotters import loss_paths_plot_ours, loss_paths_plot_theirs
 from modules.lagrangians import L_HO, L_double_well
 
 ############################# GENERAL PARAMETERS #############################
 # General parameters
-#dev = 'cuda' if torch.cuda.is_available() else 'cpu'
-dev = 'cpu'
+dev = 'cuda' if torch.cuda.is_available() else 'cpu'
 which_net = 'theirs'
 M = 2048 # training set (latent space) size
 N = 32 # length of the paths
 batch_size = 128 # batch size
 Nc = batch_size # number of gaussian components
-M_MC = 10
+M_MC = 100
+torch.manual_seed(3)
 
 t_0 = 0.
 t_f = 0.5
-x_i = torch.tensor(0.).to(dev)
-x_f = torch.tensor(1.).to(dev)
+x_i = 0.
+x_f = 1.
 t = [torch.tensor(e) for e in np.linspace(t_0, t_f, N)]
 h = t[1] - t[0]
 potential = L_HO
 
 # Neural network parameters
 input_size = 2 if which_net == 'theirs' else 1 # dimension of the input 
-nhid = 10 # number of hidden neurons
-hidden_size = 10 # dimension of the LSTM hidden state vector
+nhid = 20 # number of hidden neurons
+hidden_size = 20 # dimension of the LSTM hidden state vector
 out_size = 3 # size of the LSTM output, y
-num_layers = 1 # number of stacked LSTM layers
-Dense = True # controls wether there is a Linear layer after the LSTM or not
+num_layers = 2 # number of stacked LSTM layers
+Dense_bool = True # controls wether there is a Linear layer after the LSTM or not
 if which_net == 'ours':
     # Input to LSTM: M sequences, each of length 1, elements of dim input_size
     z = 3 * (2*torch.rand(M, 1, 1) - torch.ones(M, 1, 1)).to(dev)
@@ -55,14 +55,15 @@ elif which_net == 'theirs':
     
 # Hyperparameters
 learning_rate = 1e-4
+dropout = 0.
 
 # Training parameters
 n_epochs = 3000
 
 # Plotting parameters
 show_periodic_plots = True
-n_plots = n_epochs
-bound = 20
+n_plots = 300
+bound = 10
 show_loss_i = True
 show_loss_f = True
 dx = 0.1
@@ -71,11 +72,13 @@ leap = n_epochs/n_plots
 # Saves
 save_model = False
 
-torch.manual_seed(1)
+# Automatic stuff
 dx_list = [dx for e in range(M)]
+x_i = torch.tensor(x_i).to(dev)
+x_f = torch.tensor(x_f).to(dev)
 
 ############################# NEURAL NETWORK #############################
-hidden_size = hidden_size if Dense else out_size
+hidden_size = hidden_size if Dense_bool else out_size
 if which_net == 'ours':
     vfpg = VFPG_ours(dev=dev,
                      M=batch_size,
@@ -85,7 +88,7 @@ if which_net == 'ours':
                      hidden_size=hidden_size, 
                      out_size=out_size,
                      num_layers=num_layers, 
-                     Dense=Dense).to(dev)
+                     Dense=Dense_bool).to(dev)
 elif which_net == 'theirs':
     vfpg = VFPG_theirs_v2(dev=dev,
                        batch_size=batch_size,
@@ -95,7 +98,8 @@ elif which_net == 'theirs':
                        hidden_size=hidden_size, 
                        out_size=out_size,
                        num_layers=num_layers, 
-                       Dense=Dense).to(dev)
+                       Dense=Dense_bool,
+                       dropout=dropout).to(dev)
     
 optimizer = torch.optim.Adam(params=vfpg.parameters(), 
                              lr=learning_rate)
@@ -110,8 +114,10 @@ print(f'Training a model with {count_params(vfpg)} parameters on {dev}.\n')
 
 for j in tqdm(range(n_epochs)):
     for b in range(M // batch_size):
+        loss_batch = []
+        loss_KL_batch = []
         z_b = z[b*batch_size:(b+1)*batch_size, :, :]
-        L, L_KL, L_i, L_f, delta_L, paths = train_loop(model=vfpg, 
+        L, L_KL, L_i, L_f, delta_L, paths, log_q_phi, S_paths = train_loop(model=vfpg, 
                                                        loss_fn=loss_fn, 
                                                        optimizer=optimizer, 
                                                        train_set=z_b, 
@@ -121,10 +127,12 @@ for j in tqdm(range(n_epochs)):
                                                        h=h,
                                                        x_i=x_i,
                                                        x_f=x_f)
+        loss_batch.append(L.item())
+        loss_KL_batch.append(L_KL.item())
         
     # Loss tracking
-    loss_list.append(L.item())
-    loss_KL_list.append(L_KL.item())
+    loss_list.append(np.mean(loss_batch))
+    loss_KL_list.append(np.mean(loss_KL_batch))
     loss_i_list.append(L_i.item())
     loss_f_list.append(L_f.item())
     # Periodic plots
@@ -148,7 +156,10 @@ for j in tqdm(range(n_epochs)):
                         loss_f_list=loss_f_list,
                         delta_L=delta_L,
                         show_loss_i=show_loss_i,
-                        show_loss_f=show_loss_f)
+                        show_loss_f=show_loss_f,
+                        log_q_phi=log_q_phi,
+                        S_paths=S_paths)
+
         
 print('\nDone! :)')
 

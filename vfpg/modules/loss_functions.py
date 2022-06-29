@@ -185,6 +185,7 @@ def loss_DKL_v2(model, train_set=[], target_set=[], potential=L_HO, M_MC=100,
     print_(f'mus_f: {mus_f}', mus_f.shape)
     
     # Loss_KL
+    """
     paths = []
     paths_cond_probs = []
     for _ in range(M_MC):
@@ -195,6 +196,8 @@ def loss_DKL_v2(model, train_set=[], target_set=[], potential=L_HO, M_MC=100,
         paths_cond_probs.append(path_cond_probs)
     paths = torch.stack(paths) # size [M, N]
     paths_cond_probs = torch.stack(paths_cond_probs) # size [M, N]
+    """
+    paths, paths_cond_probs = model.sample_tocho(M_MC, gammas, mus, sigmas)
     print_(f'stacked paths: {paths}', paths.shape)
     print_(f'stacked probs: {paths_cond_probs}', paths_cond_probs.shape)
     
@@ -206,7 +209,7 @@ def loss_DKL_v2(model, train_set=[], target_set=[], potential=L_HO, M_MC=100,
     
     M_MC = torch.tensor(M_MC)
     log_q_phi = torch.sum(torch.log(paths_cond_probs), dim=1)
-    f = (1/hbar)*S_paths + log_q_phi
+    f = S_paths + hbar*log_q_phi
     loss_KL = (1/M_MC)*torch.sum(f)
     MC_err = torch.sqrt((1/M_MC)*torch.sum(f**2)-loss_KL**2) / torch.sqrt(M_MC)
 
@@ -220,4 +223,4 @@ def loss_DKL_v2(model, train_set=[], target_set=[], potential=L_HO, M_MC=100,
     # Total loss
     loss = loss_KL + loss_i + loss_f
 
-    return loss, loss_KL, loss_i, loss_f, MC_err, paths  
+    return loss, loss_KL, loss_i, loss_f, MC_err, paths, log_q_phi, S_paths
