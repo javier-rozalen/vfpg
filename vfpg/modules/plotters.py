@@ -69,9 +69,9 @@ def loss_paths_plot_theirs(bound, time_grid, path_manifold, wf, current_epoch,
     x_axis = (S_paths - S_E_min.repeat(S_paths.size(0))) / hbar
     b = (-loss_KL_list[-1] + S_E_min) / hbar
     y_axis = log_q_phi + b.repeat(log_q_phi.size(0))
-    ax0.scatter(x_axis.detach(), y_axis.detach())
+    ax0.scatter(x_axis.detach().cpu(), y_axis.detach().cpu())
     #ax0.plot(x_axis.detach(), -x_axis.detach(), color='red', label='Exact')
-    ax0.legend(fontsize=16)
+    #ax0.legend(fontsize=16)
     
     # Loss
     ax1 = ax[0][1]

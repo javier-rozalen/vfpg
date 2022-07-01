@@ -514,8 +514,8 @@ class VFPG_theirs_v2(nn.Module):
         print_(f'chosen _sigmas_categ: {chosen_sigmas}', chosen_sigmas.shape)
         
         # We use the chosen mus, sigmas to sample a path
-        g = torch.randn(M_MC, self.N, 1).to(self.dev) 
-        x_pred = chosen_mus + g*chosen_sigmas # size [M_MC, N, 1]
+        normal_dist = Normal(loc=chosen_sigmas, scale=chosen_mus)
+        x_pred = normal_dist.rsample() # size [M_MC, N, 1]
         print_(f'x_pred: {x_pred}', x_pred.shape)
     
         # We compute the (conditional) probability of each step of the path

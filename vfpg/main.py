@@ -21,13 +21,15 @@ from modules.lagrangians import L_HO, L_double_well
 ############################# GENERAL PARAMETERS #############################
 # General parameters
 dev = 'cuda' if torch.cuda.is_available() else 'cpu'
+#dev = 'cpu'
 which_net = 'theirs'
 M = 2048 # training set (latent space) size
 N = 32 # length of the paths
-batch_size = 128 # batch size
+batch_size = 256 # batch size
+
 Nc = batch_size # number of gaussian components
-M_MC = 100
-torch.manual_seed(3)
+M_MC = 10000
+torch.manual_seed(1)
 
 t_0 = 0.
 t_f = 0.5
@@ -39,10 +41,10 @@ potential = L_HO
 
 # Neural network parameters
 input_size = 2 if which_net == 'theirs' else 1 # dimension of the input 
-nhid = 20 # number of hidden neurons
-hidden_size = 20 # dimension of the LSTM hidden state vector
+nhid = 6 # number of hidden neurons
+hidden_size = 6 # dimension of the LSTM hidden state vector
 out_size = 3 # size of the LSTM output, y
-num_layers = 2 # number of stacked LSTM layers
+num_layers = 1 # number of stacked LSTM layers
 Dense_bool = True # controls wether there is a Linear layer after the LSTM or not
 if which_net == 'ours':
     # Input to LSTM: M sequences, each of length 1, elements of dim input_size
@@ -132,7 +134,7 @@ for j in tqdm(range(n_epochs)):
         
     # Loss tracking
     loss_list.append(np.mean(loss_batch))
-    loss_KL_list.append(np.mean(loss_KL_batch))
+    loss_KL_list.append(loss_KL_batch[-1])
     loss_i_list.append(L_i.item())
     loss_f_list.append(L_f.item())
     # Periodic plots

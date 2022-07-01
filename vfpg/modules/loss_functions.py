@@ -197,7 +197,10 @@ def loss_DKL_v2(model, train_set=[], target_set=[], potential=L_HO, M_MC=100,
     paths = torch.stack(paths) # size [M, N]
     paths_cond_probs = torch.stack(paths_cond_probs) # size [M, N]
     """
+    #paths_sample, _ = model.sample_tocho(M_MC, gammas, mus, sigmas)
     paths, paths_cond_probs = model.sample_tocho(M_MC, gammas, mus, sigmas)
+    #paths = paths.unsqueeze(0)
+    #paths_cond_probs = paths_cond_probs.unsqueeze(0)
     print_(f'stacked paths: {paths}', paths.shape)
     print_(f'stacked probs: {paths_cond_probs}', paths_cond_probs.shape)
     
