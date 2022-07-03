@@ -1,9 +1,10 @@
 
 # -*- coding: utf-8 -*-
 
-import torch, logging
+import torch
 from torch import nn
 from torch.distributions.categorical import Categorical
+from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.normal import Normal
 import numpy as np
 
@@ -557,6 +558,123 @@ class VFPG_theirs_v2(nn.Module):
 
         return gammas, mus, sigmas
 
+class VFPG_theirs_v3(nn.Module):
+
+    def __init__(self, dev, batch_size, N, input_size, nhid, hidden_size, out_size, 
+                 num_layers, Dense=True, dropout=0):
+        super(VFPG_theirs_v2, self).__init__()
+        
+        # Auxiliary stuff
+        self.dev = dev
+        self.batch_size = batch_size # batch size
+        self.Nc = self.batch_size # number of gaussian components
+        self.N = N # length of each path
+        self.input_size = input_size
+        self.nhid = nhid # number of hidden neurons 
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.Dense_bool = Dense
+        self.pi = torch.tensor(np.pi)
+        self.softmax = nn.Softmax(dim=0)
+        self.softplus = nn.Softplus()
+        
+        # Neural Network
+        self.lstm = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            batch_first=True,
+                            dropout=dropout)
+        self.fc = nn.Linear(in_features=hidden_size, 
+                            out_features=out_size,                                                   
+                            bias=True)
+        self.activation = nn.Softplus()
+        self.Dense = nn.Sequential(self.fc, self.activation)
+        
+    def GMM(self, params):    
+        # params.shape = [batch_size, N, 3]
+        gammas = self.softmax(params[:, :, 0]) # size [batch_size, N]
+        mus = params[:, :, 1] # size [batch_size, N]
+        sigmas2 = self.softplus(params[:, :, 2]) # size [batch_size, N]
+        
+        print_(f'gammas: {gammas}', gammas.shape)
+        print_(f'mus: {mus}', mus.shape)
+        print_(f'sigmas2: {sigmas2}', sigmas2.shape)
+        
+        return gammas, mus, sigmas2 
+    
+    def sample_tocho(self, M_MC, gammas, mus, sigmas):
+        # Sampling from the mixture density
+        
+        # We add an extra dimension of size M_MC to sample M_MC paths "at once"
+        gammas = gammas.repeat(M_MC, 1, 1)
+        mus = mus.repeat(M_MC, 1, 1)
+        sigmas = sigmas.repeat(M_MC, 1, 1)
+        print_(f'extended gamas: {gammas}', gammas.shape)
+        
+        # We transpose [batch_size, N] --> [N, batch_size] because we need
+        # to apply Categorical on gammas.
+        _gammas_categ = gammas.transpose(1,2) # size [M_MC, N, batch_size]
+        _mus_categ = mus.transpose(1,2) # size [M_MC, N, batch_size]
+        _sigmas_categ = sigmas.transpose(1,2) # size [M_MC, N, batch_size]
+        print_(f'_gammas_categ: {_gammas_categ}', _gammas_categ.shape)
+        print_(f'_mus_categ: {_mus_categ}', _mus_categ.shape)
+        print_(f'_sigmas_categ: {_sigmas_categ}', _sigmas_categ.shape)
+        
+        # We sample from the categorical gammas and keep the chosen mus, sigmas
+        g_sampled_idcs = Categorical(_gammas_categ).sample().unsqueeze(2) # size [M_MC, N, 1]
+        print_(f'g_sampled_idcs: {g_sampled_idcs}', g_sampled_idcs.shape)
+        chosen_gammas = _gammas_categ.gather(2, g_sampled_idcs) # size [M_MC, N, 1]
+        chosen_mus = _mus_categ.gather(2, g_sampled_idcs) # size [M_MC, N, 1]
+        chosen_sigmas = _sigmas_categ.gather(2, g_sampled_idcs) # size [M_MC, N, 1]
+        print_(f'chosen _gammas_categ: {chosen_gammas}', chosen_gammas.shape)
+        print_(f'chosen _mus_categ: {chosen_mus}', chosen_mus.shape)
+        print_(f'chosen _sigmas_categ: {chosen_sigmas}', chosen_sigmas.shape)
+        
+        # We use the chosen mus, sigmas to sample a path
+        cov_mat = torch.diag_embed(chosen_sigmas)
+        multivariate_normal_dist = Normal(loc=chosen_sigmas, 
+                                          covariance_matrix=cov_mat)
+        x_pred = multivariate_normal_dist.rsample() # size [M_MC, N, 1]
+        print_(f'x_pred: {x_pred}', x_pred.shape)
+    
+        # We compute the (conditional) probability of each step of the path
+        print_(f'x_pred_rep: {x_pred.repeat(1, 1, self.batch_size)}', 
+              x_pred.repeat(1, 1, self.batch_size).shape)
+        x_pred_rep = x_pred.repeat(1, 1, self.batch_size) # size [M_MC, N, batch_size]
+        kernels_exponent = (x_pred_rep - _mus_categ)**2
+        kernels = torch.exp(-0.5*kernels_exponent) / (_sigmas_categ**2)
+        kernels /= ((2*self.pi)**(self.N/2))*(_sigmas_categ**self.N) # size [M_MC, N, batch_size]
+        print_(f'kernels: {kernels}', kernels.shape)
+        
+        _gammas = gammas.view(M_MC, self.N, 1, self.batch_size)
+        _kernels = kernels.view(M_MC, self.N, self.batch_size, 1)
+        print_(f'_gammas: {_gammas}', _gammas.shape)
+        print_(f'_kernels: {_kernels}', _kernels.shape)
+        
+        x_cond_prob = (_gammas @ _kernels).squeeze(3).squeeze(2)
+        print_(f'x_pred final: {x_pred.squeeze()}', x_pred.squeeze().shape)
+        print_(f'x_cond_prob final: {x_cond_prob}', x_cond_prob.shape)
+        
+        return x_pred.squeeze(), x_cond_prob
+        
+    def forward(self, z):
+        
+        # Initial cell states
+        h_t = torch.zeros(self.num_layers, self.batch_size, self.hidden_size).to(self.dev)
+        c_t = torch.zeros(self.num_layers, self.batch_size, self.hidden_size).to(self.dev)
+        
+        h_last_layer, (h_t, c_t) = self.lstm(z, (h_t, c_t)) # LSTM
+        
+        print_(f'h_last_layer: {h_last_layer}', h_last_layer.shape)
+        print_(f'h_t: {h_t}', h_t.shape)
+        print_(f'c_t: {c_t}', c_t.shape)
+        
+        y = self.Dense(h_last_layer) if self.Dense_bool else h_last_layer # Linear
+        # y.shape = [batch_size, N, 3]
+        print_(f'y: {y}', y.shape)
+        gammas, mus, sigmas = self.GMM(y) # mixture params computation
+
+        return gammas, mus, sigmas
 ####################### TESTS #######################
 if __name__ == '__main__':    
     print('Helloooo')

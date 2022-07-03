@@ -15,6 +15,7 @@ def dir_support(list_of_nested_dirs):
     -------
     None.
     """
+    
     for i in range(len(list_of_nested_dirs)):
         potential_dir = '/'.join(list_of_nested_dirs[:i+1]) 
         if not os.path.exists(potential_dir):
