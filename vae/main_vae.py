@@ -26,26 +26,29 @@ from modules.loss_functions import ELBO
 
 ######################## PARAMETERS ########################
 # General parameters
-dev = 'cpu'
-N = 10
+dev = 'cuda' if torch.cuda.is_available() else 'cpu'
+N = 20
 M = 10000
+M_bound = 2000
+fixed_endpoints = False
+x0 = torch.tensor(0.5) # fixed endpoint 
 
 # Names of files, directories
-paths_file = f'../MonteCarlo/saved_data/paths_N{N}_M{M}.txt'
-actions_file = f'../MonteCarlo/saved_data/actions_N{N}_M{M}.txt'
+paths_file = f'../MonteCarlo/saved_data/double_well/paths_N{N}_M{M}.txt'
+actions_file = f'../MonteCarlo/saved_data/double_well/actions_N{N}_M{M}.txt'
 trained_models_path = 'saved_models/'
 trained_plots_path = 'saved_plots/'
 
 # Neural network parameters
-latent_size = 5
+latent_size = 10
 hidden_size_enc = 100
 hidden_size_dec = 100
 
 # Training parameters
-n_epochs = 3
-batch_size = 500
-MC_size = 500
-lr = 1e-4
+n_epochs = 500
+batch_size = 150
+MC_size = 1000
+lr = 5e-4
 
 # Plotting parameters
 n_plots = 10
@@ -56,34 +59,85 @@ leap = n_epochs/n_plots
 save_model = True
 save_plot = True
 show_periodic_plots = True
+continue_from_last = False
 
-trained_model_name = (f'nepochs{n_epochs}_lr{lr}_N{N}_n{MC_size}_b{batch_size}_'
-                      f's{latent_size}')
+if fixed_endpoints:
+    endpoint = round(x0.item(), 2)
+    trained_model_name = (f'fixed{endpoint}_nepochs{n_epochs}_lr{lr}_N{N}'
+                          f'_n{MC_size}_b{batch_size}_s{latent_size}')
+    trained_models_path += 'fixed_endpoints/' 
+    trained_plots_path += 'fixed_endpoints/' 
+
+else:
+    trained_model_name = (f'free_nepochs{n_epochs}_lr{lr}_N{N}'
+                          f'_n{MC_size}_b{batch_size}_s{latent_size}')
+    trained_models_path += 'free_endpoints/'
+    trained_plots_path += 'free_endpoints/' 
+
 full_model_name = trained_models_path + trained_model_name + '.pt'
 full_plot_name = trained_plots_path + trained_model_name + '.pdf'
+
+# copy here the path of the model to resume training:
+model_to_resume = trained_models_path + 'free_nepochs80_lr0.005_N20_n1000_b150_s10.pt'
 
 ######################## DATA FETCHING ########################
 print('Fetching data...')
 train_set, actions_set = fetch_data(M, paths_file, actions_file)
+if fixed_endpoints:
+    idcs = []
+    for i in range(len(train_set)):
+        if abs(train_set[i][0]-x0) <= 1e-1:
+            idcs.append(i)
+    idcs = torch.tensor(idcs)     
+    M_bound = len(idcs)  
+    batch_size = 50
+    train_set = torch.index_select(train_set, 0, idcs).to(dev)
+    print(f'train_set: {train_set}', train_set.shape)
+else:
+    # The last M_bound paths are (hopefully) better distributed
+    train_set = train_set[:train_set.size(0)-M_bound].to(dev)
 print('Data fetching complete.\n')
 
-M = 1000
-train_set = train_set[:M]
-# train_set shape: [M, N]
+# train_set shape: [M_bound, N]
 ######################## NEURAL NETWORK ########################
-vae = VAE(sample_size=N,
-          batch_size=batch_size,
-          latent_size=latent_size,
-          MC_size=MC_size,
-          hidden_size_enc=hidden_size_enc,
-          hidden_size_dec=hidden_size_dec)
-
 loss_fn = ELBO
-optimizer = torch.optim.Adam(params=vae.parameters(),
-                             lr=lr)
+
+if continue_from_last:
+    print('Resuming training...')
+    sample_size = torch.load(model_to_resume)['N']
+    batch_size = torch.load(model_to_resume)['b']
+    latent_size = torch.load(model_to_resume)['s']
+    MC_size = torch.load(model_to_resume)['MC_size']
+    hidden_size_enc = torch.load(model_to_resume)['hidden_size_enc']
+    hidden_size_dec = torch.load(model_to_resume)['hidden_size_dec']
+    vae = VAE(dev=dev,
+              sample_size=N,
+              batch_size=batch_size,
+              latent_size=latent_size,
+              MC_size=MC_size,
+              hidden_size_enc=hidden_size_enc,
+              hidden_size_dec=hidden_size_dec).to(dev)
+    vae.load_state_dict(torch.load(model_to_resume)['state_dict'])
+    lr = torch.load(model_to_resume)['lr']
+    optimizer = torch.optim.Adam(params=vae.parameters(), lr=lr)
+    optimizer.load_state_dict(torch.load(model_to_resume)['optim_state_dict'])
+else:
+    vae = VAE(dev=dev,
+              sample_size=N,
+              batch_size=batch_size,
+              latent_size=latent_size,
+              MC_size=MC_size,
+              hidden_size_enc=hidden_size_enc,
+              hidden_size_dec=hidden_size_dec).to(dev)
+    optimizer = torch.optim.Adam(params=vae.parameters(), lr=lr)
 
 ######################## TRAINING LOOP #########################
 print(f'Training a model with {count_params(vae)} parameters on {dev}.')
+print('---------------------------------------------------------------')
+print(vae)
+print('---------------------------------------------------------------\n')
+print(f'Training set size: {M_bound}')
+print(f'Example paths endpoints: {"fixed" if fixed_endpoints else "free"}')
 print(f'Sample size: {N}')
 print(f'Latent size: {latent_size}')
 print(f'Encoder hidden size: {hidden_size_enc}')
@@ -100,12 +154,15 @@ loss_list = []
 # Epoch loop
 for j in tqdm(range(n_epochs)):
     # Batch loop
-    for b in range(M // batch_size):
+    for b in range(M_bound // batch_size):
+        #print(f'batch {b}')
         z_b = train_set[b*batch_size:(b+1)*batch_size, :]
-        loss, MC_error = train_loop(model=vae,
+        loss, MC_error = train_loop(dev=dev,
+                                    model=vae,
                                     loss_fn=loss_fn,
                                     optimizer=optimizer,
                                     train_set=z_b)
+        #print(loss)
     loss_list.append(loss)
     
     if (j % leap) == 0 and show_periodic_plots:

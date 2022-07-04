@@ -28,17 +28,28 @@ from modules.loss_functions import ELBO
 
 ######################## PARAMETERS ########################
 # General parameters
-n_paths = 2
+n_paths = 500
+fixed_endpoints = False
+trained_models_path = 'saved_models/'
 
 # Plotting parameters
+t_0 = 0.
+t_f = 100
 dx = 0.1 # histogram bin size
+bound = 6
 save_plot = False
 plot_path = 'saved_plots/'
 plot_name = 'histogram.pdf'
 full_plot_path = plot_path + plot_name
+
+if fixed_endpoints:
+    trained_models_path += 'fixed_endpoints/'
+else:
+    trained_models_path += 'free_endpoints/'
+
 ######################## LOADING THE TRAINED MODEL ########################
 # copy from the training console output: 
-trained_model = 'saved_models/nepochs3_lr0.0001_N10_n500_b500_s5.pt' 
+trained_model = trained_models_path + 'free_nepochs500_lr0.0005_N20_n1000_b150_s10.pt' 
 
 # Variatonal AutoEncoder
 sample_size = torch.load(trained_model)['N']
@@ -48,7 +59,8 @@ MC_size = torch.load(trained_model)['MC_size']
 hidden_size_enc = torch.load(trained_model)['hidden_size_enc']
 hidden_size_dec = torch.load(trained_model)['hidden_size_dec']
 
-vae = VAE(sample_size=sample_size,
+vae = VAE(dev='cpu',
+          sample_size=sample_size,
           batch_size=batch_size,
           latent_size=latent_size,
           MC_size=MC_size,
@@ -90,8 +102,12 @@ x_axis = np.linspace(-4.95,4.95,100)
 if save_plot:
     dir_support([plot_path])
     
+time_grid = [e for e in np.linspace(t_0, t_f, sample_size)]
 histogram_plot(x_axis=x_axis,
                y_axis = wf2,
+               path_manifold=paths,
+               bound=bound,
+               time_grid=time_grid,
                save_plot=save_plot,
                plot_path=full_plot_path)
 

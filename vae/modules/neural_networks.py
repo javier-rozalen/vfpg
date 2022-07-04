@@ -15,7 +15,7 @@ def print_(*message):
         print(*message)
 
 class VAE(nn.Module):
-    def __init__(self, sample_size, batch_size, latent_size, MC_size, 
+    def __init__(self, dev, sample_size, batch_size, latent_size, MC_size, 
                  hidden_size_enc, hidden_size_dec):
         super(VAE, self).__init__()     
         
@@ -25,6 +25,7 @@ class VAE(nn.Module):
             # hidden_size_enc/dec --> number of hidden neurons of enc/dec
             
         # Auxiliary stuff
+        self.dev = dev
         self.batch_size = batch_size
         self.latent_size = latent_size
         self.MC_size = MC_size
@@ -66,7 +67,7 @@ class VAE(nn.Module):
         print_(f'covariance matrix: {cov_mat}', cov_mat.shape)
         encoder_dist = MultivariateNormal(loc=enc_mus, 
                                           covariance_matrix=cov_mat)
-        z = encoder_dist.rsample(torch.Size([self.MC_size])) 
+        z = encoder_dist.rsample(torch.Size([self.MC_size])).to(self.dev)
         # z shape = [MC_size, batch_size, latent_size]
         
         return z

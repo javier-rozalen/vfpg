@@ -15,7 +15,7 @@ def print_(*message):
         print(*message)
         
 ############################ LOSS FUNCTIONS ##############################
-def ELBO(vae, train_data):
+def ELBO(vae, train_data, dev):
     
     # We get the encoder and decoder variational parameters and also the latent
     # space variable z sampled from the encoder
@@ -24,9 +24,9 @@ def ELBO(vae, train_data):
     MC_size, batch_size, latent_size = z.size(0), z.size(1), z.size(2)
 
     # Prior of z is a Normal(0, 1)
-    prior_z_loc = torch.zeros(batch_size, latent_size)
+    prior_z_loc = torch.zeros(batch_size, latent_size).to(dev)
     prior_z_cov_mat = torch.eye(latent_size).reshape(1, latent_size, latent_size)
-    prior_z_cov_mat = prior_z_cov_mat.repeat(batch_size, 1, 1)
+    prior_z_cov_mat = prior_z_cov_mat.repeat(batch_size, 1, 1).to(dev)
     print_(f'prior_z loc: {prior_z_loc}', prior_z_loc.shape)
     print_(f'prior_z_cov_mat: {prior_z_cov_mat}', prior_z_cov_mat.shape)
     prior_z_dist = MultivariateNormal(loc=prior_z_loc, 

@@ -1,7 +1,7 @@
 import torch, os
 import numpy as np
 
-def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0):
+def train_loop(dev, model, loss_fn, optimizer, train_set=0, target_data=0):
     """
     Training loop.
 
@@ -18,7 +18,7 @@ def train_loop(model, loss_fn, optimizer, train_set=0, target_data=0):
 
     """  
     optimizer.zero_grad()
-    loss, MC_error = loss_fn(model, train_set)
+    loss, MC_error = loss_fn(model, train_set, dev)
     loss.backward()
     optimizer.step()
     
@@ -65,7 +65,7 @@ def fetch_data(n_examples, paths_file, actions_file):
         file.close()
     x_tensor = torch.stack(path_manifold)
     S_tensor = torch.stack(S_manifold)
-    
+
     train_set = x_tensor[:n_examples]
     actions_set = S_tensor[:n_examples]
     

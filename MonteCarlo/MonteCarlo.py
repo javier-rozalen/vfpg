@@ -16,13 +16,13 @@ from tqdm import tqdm
 import scipy.integrate as integrate
 
 # My Modules
-from modules.actions import S_HO
+from modules.actions import S_HO, S_double_well
 from modules.plotters import histo2
 from modules.dir_support import dir_support
 
 ################################# GENERAL PARAMETERS ##########################
 seed = 1
-N = 30
+N = 20
 mu = 0
 sigma = 1/6
 M = 10000
@@ -34,18 +34,25 @@ T = 100
 d = 1.
 dx = 0.1
 hbar = 1.
+action = S_double_well
 metropolis = True
 save_data = False
 
+if action == S_HO:
+    paths_file = f'saved_data/paths_N{N}_M{M}.txt'
+    actions_file = f'saved_data/actions_N{N}_M{M}.txt'
+elif action == S_double_well:
+    paths_file = f'saved_data/double_well/paths_N{N}_M{M}.txt'
+    actions_file = f'saved_data/double_well/actions_N{N}_M{M}.txt'
 ###############################################################################
 dir_support(['saved_data'])
 np.random.seed(seed)
 h = T/N
 
 x0 = [0.]*N
-x0 = np.random.normal(0, 1, N).tolist()
+#x0 = np.random.normal(0, 1, N).tolist()
 paths = [x0]
-S_paths = [S_HO(x0, h, m, w)]
+S_paths = [action(x0, h, m, w)]
 wf = np.array([0.]*100)
 
 def histograma(x,dx):
@@ -75,7 +82,10 @@ def histograma(x,dx):
         while -5 + j*dx <= +5 and done == False:
 			
             if x[i] >= -5 + j*dx and x[i] <= -5 + (j + 1)*dx:
-                count[j] += 1
+                try:
+                    count[j] += 1
+                except:
+                    pass
                 done = True
             else:
                 j += 1
@@ -86,15 +96,15 @@ if metropolis:
     k = 0
     n_accepted = 1
     pbar = tqdm(total=M)
-    with open(f'saved_data/paths_N{N}_M{M}.txt', 'w') as file:
-        with open(f'saved_data/actions_N{N}_M{M}.txt', 'w') as file2:
+    with open(paths_file, 'w') as file:
+        with open(actions_file, 'w') as file2:
             while n_accepted < M:
                 chi = np.random.normal(mu, sigma, N)
                 path_old = paths[-1]
                 path_new = path_old + d*chi
                 path_new[-1] = path_new[0]
-                S_new = S_HO(path_new, h, m, w)
-                S_old = S_HO(path_old, h, m, w)
+                S_new = action(path_new, h, m, w)
+                S_old = action(path_old, h, m, w)
                 delta_S = S_new - S_old
                 
                 if delta_S <= 0:
