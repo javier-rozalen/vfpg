@@ -34,9 +34,10 @@ T = 100
 d = 1.
 dx = 0.1
 hbar = 1.
-action = S_double_well
+action = S_HO
 metropolis = True
 save_data = False
+write_data = True
 
 if action == S_HO:
     paths_file = f'saved_data/paths_N{N}_M{M}.txt'
@@ -120,10 +121,11 @@ if metropolis:
                     n_accepted += 1
                     paths.append(path_new)
                     S_paths.append(S_new)
-                    file.write(' '.join([str(x) for x in path_new]) + '\n')
-                    file.write(' '.join([str(x) for x in -path_new]) + '\n')
-                    file2.write(str(S_new) + '\n')
-                    file2.write(str(S_new) + '\n')
+                    if write_data:
+                        file.write(' '.join([str(x) for x in path_new]) + '\n')
+                        file.write(' '.join([str(x) for x in -path_new]) + '\n')
+                        file2.write(str(S_new) + '\n')
+                        file2.write(str(S_new) + '\n')
                     pbar.update(1)
                     if n_accepted > n_faulty:
                         wf += histograma(path_new, dx) + histograma(-path_new, dx)

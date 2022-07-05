@@ -15,15 +15,12 @@ def dir_support(list_of_nested_dirs):
     ----------
     nested_dirs : list
         Contains all nested directories in order.
-
     Returns
     -------
     None.
-
     """
-    for nested_dirs in list_of_nested_dirs:
-        for i in range(len(nested_dirs)):
-            potential_dir = '/'.join(nested_dirs[:i+1]) if len(list_of_nested_dirs)>1 else nested_dirs
-            if not os.path.exists(potential_dir):
-                os.makedirs(potential_dir)
-                print(f'Creating directory {potential_dir}...')
+    for i in range(len(list_of_nested_dirs)):
+        potential_dir = '/'.join(list_of_nested_dirs[:i+1]) 
+        if not os.path.exists(potential_dir):
+            os.makedirs(potential_dir)
+            print(f'Creating directory {potential_dir}...')
