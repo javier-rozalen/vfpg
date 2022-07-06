@@ -102,6 +102,31 @@ def histogram(x, dx):
                 else:
                     j += 1
     return np.array(count)
+
+def S_HO(x, h, m, w):
+    """
+    Euclidean-time action of the 1D, 1-particle H.O.
+    
+    Parameters
+    ----------
+    x : list
+        (positions of the) Path.
+
+    Returns
+    -------
+    S : float
+        Action of the path given as input.
+
+    """
+    S_prime = 0.
+    for i in range(len(x)-1):
+        x_i1 = x[i+1]
+        x_i = x[i]
+        K = ((x_i1-x_i)/h)**2
+        V = (w*(x_i1+x_i)/2)**2
+        S_prime += K + V
+        
+    return 0.5*m*h*S_prime
     
 ####################### TESTS #######################
 if __name__ == '__main__':  

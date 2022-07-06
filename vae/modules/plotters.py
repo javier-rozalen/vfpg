@@ -41,7 +41,7 @@ def histogram_plot(x_axis, y_axis, path_manifold, bound, time_grid,
     ax.hist(x_axis, weights=y_axis, bins=int(len(x_axis)))
     #ax.plot(x_axis,y_axis,linestyle='none',marker='o')
     ax.plot(x_target, y_target, label='$|\Psi_0(x)|^2,\quad\sigma=1$')
-    ax.set_xlim(-5, 5)
+    ax.set_xlim(-3, 3)
     ax.set_ylabel('$|\Psi(x)|^2$', fontsize=15)
     ax.tick_params(axis='both', labelsize=15)
     ax.legend(fontsize=16)
@@ -53,7 +53,31 @@ def histogram_plot(x_axis, y_axis, path_manifold, bound, time_grid,
     ax.set_ylabel(r'$\tau$', fontsize=17)
     ax.tick_params(axis='both', labelsize=15, labeltop=True, top=True)
     for path in path_manifold[:bound]:
-        ax.plot(path.detach(), time_grid)
+        ax.plot(path.cpu().detach(), time_grid)
+    
+    # Save
+    if save_plot:
+        plt.savefig(plot_path, format='pdf', bbox_inches='tight')
+        print(f'Plot correctly saved at: {plot_path}')
+    
+    plt.show()
+    
+def master_plot(x_axis_train, y_axis_train, x_axis_test, y_axis_test,
+                save_plot=False, plot_path=''):
+    
+    """Plots logp(x) vs S(x)/hbar"""
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+       
+    ax.set_title(r'Path distribution', fontsize=17)
+    ax.set_xlabel(r'$S_E(\vec{x})/\hbar$', fontsize=17)
+    ax.set_ylabel(r'$\log p(\vec{x})$', fontsize=17)
+    ax.tick_params(axis='both', labelsize=15, top=True)
+    ax.set_xlim(0, 20)
+    
+    ax.plot(x_axis_train, [-e for e in x_axis_train], color='red', label='Exact')
+    ax.scatter(x_axis_train, y_axis_train, color='blue', label='Train') # Train data
+    ax.scatter(x_axis_test, y_axis_test, facecolors='none', edgecolors='orange', label='Test') # Test data
+    ax.legend(fontsize=15)
     
     # Save
     if save_plot:

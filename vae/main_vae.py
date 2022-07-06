@@ -29,26 +29,28 @@ from modules.loss_functions import ELBO
 dev = 'cuda' if torch.cuda.is_available() else 'cpu'
 N = 20
 M = 10000
-M_bound = 2000
+M_bound = 1000
 fixed_endpoints = False
 x0 = torch.tensor(0.5) # fixed endpoint 
+testing = True
 
 # Names of files, directories
-paths_file = f'../MonteCarlo/saved_data/double_well/paths_N{N}_M{M}.txt'
-actions_file = f'../MonteCarlo/saved_data/double_well/actions_N{N}_M{M}.txt'
+paths_file = f'../MonteCarlo/saved_data/paths_N{N}_M{M}.txt'
+actions_file = f'../MonteCarlo/saved_data/actions_N{N}_M{M}.txt'
 trained_models_path = 'saved_models/'
 trained_plots_path = 'saved_plots/'
+subdirectory = 'tests/'
 
 # Neural network parameters
-latent_size = 10
-hidden_size_enc = 100
-hidden_size_dec = 100
+latent_size = 3
+hidden_size_enc = 15
+hidden_size_dec = 15    
 
 # Training parameters
-n_epochs = 500
+n_epochs = 50
 batch_size = 150
-MC_size = 1000
-lr = 5e-4
+MC_size = 2000
+lr = 1e-3
 
 # Plotting parameters
 n_plots = 10
@@ -64,21 +66,23 @@ continue_from_last = False
 if fixed_endpoints:
     endpoint = round(x0.item(), 2)
     trained_model_name = (f'fixed{endpoint}_nepochs{n_epochs}_lr{lr}_N{N}'
-                          f'_n{MC_size}_b{batch_size}_s{latent_size}')
-    trained_models_path += 'fixed_endpoints/' 
-    trained_plots_path += 'fixed_endpoints/' 
+                          f'_n{MC_size}_b{batch_size}_s{latent_size}_'
+                          f'resumed{continue_from_last}_test{testing}')
+    trained_models_path += 'fixed_endpoints/' + subdirectory
+    trained_plots_path += 'fixed_endpoints/' + subdirectory
 
 else:
     trained_model_name = (f'free_nepochs{n_epochs}_lr{lr}_N{N}'
-                          f'_n{MC_size}_b{batch_size}_s{latent_size}')
-    trained_models_path += 'free_endpoints/'
-    trained_plots_path += 'free_endpoints/' 
+                          f'_n{MC_size}_b{batch_size}_s{latent_size}_'
+                          f'resumed{continue_from_last}_test{testing}')
+    trained_models_path += 'free_endpoints/' + subdirectory
+    trained_plots_path += 'free_endpoints/' + subdirectory
 
 full_model_name = trained_models_path + trained_model_name + '.pt'
 full_plot_name = trained_plots_path + trained_model_name + '.pdf'
 
 # copy here the path of the model to resume training:
-model_to_resume = trained_models_path + 'free_nepochs80_lr0.005_N20_n1000_b150_s10.pt'
+model_to_resume = trained_models_path + 'free_nepochs600_lr0.001_N20_n2000_b150_s1_resumedFalse_testFalse.pt'
 
 ######################## DATA FETCHING ########################
 print('Fetching data...')
@@ -165,7 +169,7 @@ for j in tqdm(range(n_epochs)):
         #print(loss)
     loss_list.append(loss)
     
-    if (j % leap) == 0 and show_periodic_plots:
+    if ((j+1) % leap) == 0 and show_periodic_plots:
         loss_plot(loss_list=loss_list, 
                   MC_error=MC_error, 
                   current_epoch=j, 
