@@ -29,7 +29,7 @@ from modules.loss_functions import ELBO
 dev = 'cuda' if torch.cuda.is_available() else 'cpu'
 N = 20
 M = 10000
-M_bound = 1000
+M_bound = 2000
 fixed_endpoints = False
 x0 = torch.tensor(0.5) # fixed endpoint 
 testing = True
@@ -47,13 +47,13 @@ hidden_size_enc = 15
 hidden_size_dec = 15    
 
 # Training parameters
-n_epochs = 50
+n_epochs = 30
 batch_size = 150
-MC_size = 2000
+MC_size = 1000
 lr = 1e-3
 
 # Plotting parameters
-n_plots = 10
+n_plots = 100
 adaptive_factor = 2.5
 leap = n_epochs/n_plots
 

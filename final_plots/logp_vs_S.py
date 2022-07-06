@@ -152,7 +152,7 @@ with open(file_name, 'a') as file:
 # Data fetching
 actions_train = []
 logs_prob_train = []
-with open('data/master_plot_train_set.txt', 'r') as file:
+with open('../vae/data/master_plot_train_set.txt', 'r') as file:
     for line in file.readlines():
         a, l = float(line.split(' ')[0]), float(line.split(' ')[1])
         actions_train.append(a)
@@ -161,7 +161,7 @@ with open('data/master_plot_train_set.txt', 'r') as file:
     
 actions_test = []
 logs_prob_test = []
-with open('data/master_plot_test_set.txt', 'r') as file:
+with open('../vae/data/master_plot_test_set.txt', 'r') as file:
     for line in file.readlines():
         a, l = float(line.split(' ')[0]), float(line.split(' ')[1])
         actions_test.append(a)

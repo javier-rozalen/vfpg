@@ -22,7 +22,7 @@ from modules.plotters import histo2
 from modules.dir_support import dir_support
 
 ################################# GENERAL PARAMETERS ##########################
-numbers_of_paths = [5000, 50000, 500000, 5000000]
+numbers_of_paths = [710]
 seed = 1
 N = 20
 mu = 0
@@ -37,7 +37,7 @@ dx = 0.1
 hbar = 1.
 action = S_HO
 metropolis = True
-write_data = True
+write_data = False
 
 np.random.seed(seed)
 h = T/N
@@ -139,7 +139,7 @@ with open(file, 'a') as file:
                 
         tf = time.time()
         total_time = tf-t0
-        burn_in_time = tb-t0
+        #burn_in_time = tb-t0
         print(f'npaths = {M} complete.\n')
         if write_data:
             file.write(f'{M} {total_time}\n')

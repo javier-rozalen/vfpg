@@ -22,13 +22,13 @@ from scipy import integrate
 # My modules
 from modules.neural_networks import VAE
 from modules.plotters import loss_plot, histogram_plot, master_plot
-from modules.aux_functions import S_HO, fetch_data, histogram
+from modules.aux_functions import S_HO, fetch_data, histogram, dir_support
 from modules.physical_constants import *
 from modules.loss_functions import ELBO
 
 ######################## PARAMETERS ########################
 # General parameters
-dev = 'cpu'
+dev = 'cuda'
 n_paths = 5000
 fixed_endpoints = False
 trained_models_path = 'saved_models/'
@@ -38,7 +38,7 @@ t_0 = 0.
 t_f = 100
 dx = 0.1 # histogram bin size
 bound = 6
-save_plot = False
+save_plot = True
 plot_path = 'saved_plots/'
 plot_name = 'histogram.pdf'
 full_plot_path = plot_path + plot_name
@@ -50,7 +50,7 @@ else:
 
 ######################## LOADING THE TRAINED MODEL ########################
 # copy from the training console output: 
-trained_model = trained_models_path + 'various_s/free_nepochs600_lr0.001_N20_n2000_b150_s3_resumedFalse_testTrue.pt' 
+trained_model = trained_models_path + 'tests/free_nepochs30_lr0.001_N20_n1000_b150_s3_resumedFalse_testTrue.pt' 
 
 # Variatonal AutoEncoder
 sample_size = torch.load(trained_model, map_location=torch.device(dev))['N']
@@ -96,6 +96,7 @@ tf = time.time()
 print(f'Sampling {n_paths} time: {round(tf-t0, 3)} sec. on {dev}.')
 
 ######################## HISTOGRAM ########################
+
 # We compute the density histogram from the paths and pass it to the plotter
 dx_list = [dx for e in range(n_paths)]
 counts = list(map(histogram, paths.cpu().detach().numpy(), dx_list))
@@ -109,6 +110,7 @@ if save_plot:
     dir_support([plot_path])
     
 time_grid = [e for e in np.linspace(t_0, t_f, sample_size)]
+
 histogram_plot(x_axis=x_axis,
                y_axis=wf2,
                path_manifold=paths,

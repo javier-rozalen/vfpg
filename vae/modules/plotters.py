@@ -73,6 +73,7 @@ def master_plot(x_axis_train, y_axis_train, x_axis_test, y_axis_test,
     ax.set_ylabel(r'$\log p(\vec{x})$', fontsize=17)
     ax.tick_params(axis='both', labelsize=15, top=True)
     ax.set_xlim(0, 20)
+    ax.set_ylim(-20, 0)
     
     ax.plot(x_axis_train, [-e for e in x_axis_train], color='red', label='Exact')
     ax.scatter(x_axis_train, y_axis_train, color='blue', label='Train') # Train data
