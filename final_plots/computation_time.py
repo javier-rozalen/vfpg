@@ -46,16 +46,16 @@ log_MCMC_times = [round(np.log10(e + MCMC_offset), 2) for e in MCMC_times]
 log_VAE_times = [round(np.log10(e + VAE_offset), 2) for e in VAE_times]
 
 ################ PLOTTING ################
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
 
-ax.set_title('Computation time', fontsize=18)
-ax.set_xlabel(r'$\log_{10} N_{paths}$', fontsize=17)
-ax.set_ylabel(r'$\log_{10} t$', fontsize=17)
-ax.tick_params(axis='both', labelsize=15)
+ax.set_title('Computation time', fontsize=22)
+ax.set_xlabel(r'$\log_{10} N_{paths}$', fontsize=20)
+ax.set_ylabel(r'$\log_{10} t$', fontsize=20)
+ax.tick_params(axis='both', labelsize=19)
 #ax.ticklabel_format(useOffset=False)
 ax.plot(log_n_paths, log_MCMC_times, label='MCMC')
-ax.plot(log_n_paths, log_VAE_times, label='VAE')
-ax.legend(fontsize=16)
+ax.plot(log_n_paths, log_VAE_times, label='VAE', linestyle='--')
+ax.legend(fontsize=18)
 
 if save_plot:
     plt.savefig(plot_path, format='pdf', bbox_inches='tight')

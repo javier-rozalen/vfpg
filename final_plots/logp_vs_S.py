@@ -15,6 +15,7 @@ sys.path.append('.')
 import numpy as np
 from tqdm import tqdm
 import torch, math
+import matplotlib.pyplot as plt
 
 # My modules
 from modules.neural_networks import VAE
@@ -149,6 +150,8 @@ with open(file_name, 'a') as file:
     file.close()
 
 #%% ############################## PLOTTING ###############################
+
+
 # Data fetching
 actions_train = []
 logs_prob_train = []
@@ -167,7 +170,51 @@ with open('../vae/data/master_plot_test_set.txt', 'r') as file:
         actions_test.append(a)
         logs_prob_test.append(l)
     file.close()
+    
+n_accepted_MC = []
+actions_MC = []
+with open('aux_file.txt', 'r') as file:
+    for line in file.readlines():
+        n = int(line.split(' ')[0])
+        a = float(line.split(' ')[1])
+        n_accepted_MC.append(n)
+        actions_MC.append(a)
+    file.close()
 
+def master_plot(x_axis_train, y_axis_train, x_axis_test, y_axis_test,
+                save_plot=False, plot_path=''):
+    
+    """Plots logp(x) vs S(x)/hbar"""
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+    plt.subplots_adjust(wspace=0.25)
+       
+    # logp vs S
+    ax = axes[0]
+    ax.set_title(r'Path distribution', fontsize=17)
+    ax.set_xlabel(r'$S_E(\mathbf{x})/\hbar$', fontsize=17)
+    ax.set_ylabel(r'$\log p(\mathbf{x})$', fontsize=17)
+    ax.tick_params(axis='both', labelsize=15)
+    ax.set_xlim(0, 20)
+    ax.set_ylim(-20, 0)
+    
+    ax.scatter(x_axis_train, y_axis_train, color='blue', label='Train') # Train data
+    ax.scatter(x_axis_test, y_axis_test, facecolors='none', edgecolors='orange', label='Test') # Test data
+    ax.legend(fontsize=15)
+    
+    # MC
+    ax = axes[1]
+    ax.set_title(r'$S_E[x(\tau)]$', fontsize=17)
+    ax.set_xlabel(r'$N_{paths}$', fontsize=17)
+    ax.tick_params(axis='both', labelsize=15)
+    ax.plot(n_accepted_MC[:2000], actions_MC[:2000])
+    
+    # Save
+    if save_plot:
+        plt.savefig(plot_path, format='pdf', bbox_inches='tight')
+        print(f'Plot correctly saved at: {plot_path}')
+    
+    plt.show()
+    
 # Plotting
 save_plot = True
 plot_path = 'vae_logp_vs_S.pdf'
