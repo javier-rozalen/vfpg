@@ -1,2 +1,3 @@
-# vfpg
-Variational Feynman Path Generator
+# A Generative-Model Approach to path integrals
+
+
