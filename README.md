@@ -20,7 +20,7 @@ Finally, the `numpy` library:
 We open the file MonteCarlo/main_mcmc.py, set the desired initial parameters and run the file. An explanation of the adjustable parameters can be found at the beggining of the file. If the saving parameters were set to `True`, the program will save the data under the MonteCarlo/saved_data/ folder (created automatically). 
 
 Example of the results:
-!Olis(./example_plots/MCMC_N20_M10000.png?raw=true)
+![plot](./example_plots/MCMC_N20_M10000.png?raw=true)
 
 ### Step 2. Training the VAE.
 We repeat the process of Step 1, but this time with the file vae/main_vae.py. This will train a VAE using the paths generated in Step 1 and, if desired, save the model for posterior experiments.
