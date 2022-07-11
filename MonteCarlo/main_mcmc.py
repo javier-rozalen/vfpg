@@ -76,6 +76,7 @@ dx = 0.1
 paths_file = f'saved_data/paths/paths_N{N}_M{M}.txt'
 actions_file = f'saved_data/actions/actions_N{N}_M{M}.txt'
 wf_file = f'saved_data/wave_functions/wf_N{N}_M{M}.txt'
+plot_file = f'saved_data/plots/plot_N{N}_M{M}.pdf'
     
 ##################### AUXILIARY STUFF #####################
 x_axis = np.linspace(-4.95, 4.95, 100)
@@ -136,7 +137,7 @@ if write_data:
                                    path_new)
                         if n_accepted == M-1:
                             nice_plot(x_axis, wf/wf_norm, S_paths, n_accepted,
-                                   path_new, 'mc.pdf', save=False)
+                                   path_new, plot_file, save=False)
                             x = []
                             for i in range(100):
                                 for j in range(counts[i]):
@@ -180,7 +181,7 @@ else:
                            path_new)
                 if n_accepted == M-1:
                     nice_plot(x_axis, wf/wf_norm, S_paths, n_accepted,
-                           path_new, 'mc.pdf', save=False)                                
+                           path_new, plot_file, save=False)                                
       
         k += 1
 pbar.close()
@@ -196,7 +197,7 @@ if save_wf:
 if save_plot:
     dir_support(['saved_data','plots'])
     nice_plot(x_axis, wf/wf_norm, S_paths, n_accepted,
-           path_new, f'saved_data/plots/N{N}_M{M}.pdf', save=True)
+           path_new, plot_file, save=True)
 
 
 #%% ############ <X> #############
