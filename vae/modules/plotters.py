@@ -38,6 +38,7 @@ def histogram_plot(x_axis, y_axis, y_MCMC, path_manifold, bound, time_grid,
     ax.hist(x_axis, weights=y_axis, bins=int(len(x_axis)))
     ax.plot(x_axis, y_MCMC, label='MCMC fit')
     ax.set_xlim(-3, 3)
+    ax.set_xlabel('$x$', fontsize=15)
     ax.set_ylabel('$|\Psi(x)|^2$', fontsize=15)
     ax.tick_params(axis='both', labelsize=15)
     ax.legend(fontsize=16)
