@@ -1,5 +1,5 @@
 # A Generative-Model Approach to path integrals
-hello
+
 ## Requirements
 The machine learning part of the code in the files above is written in PyTorch. It does not come with the default Python 3 installation; to install it, go to [Official PyTorch page](https://pytorch.org/get-started/locally/) or type:
 
