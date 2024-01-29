@@ -1,5 +1,20 @@
 # A Generative-Model Approach to Path Integrals
 
+## What is this repository?
+The repository contains the code generated for my [Master's Thesis](https://diposit.ub.edu/dspace/handle/2445/188120).
+
+Repository structure:
+
+```bash
+.
+├── MonteCarlo/                               # Path Integrals with MCMC 
+├── example_plots/                            # Assets
+├── vae/                                      # VAE code
+├── CITATION.cff                              # Citation file
+├── LICENSE                                   # License
+├── README.md
+```
+
 ## Requirements
 The machine learning part of the code in the files above is written in PyTorch. It does not come with the default Python 3 installation; to install it, go to [Official PyTorch page](https://pytorch.org/get-started/locally/) or type:
 
